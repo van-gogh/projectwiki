@@ -21,3 +21,6 @@ dist/
 
 # ProjectWiki local data
 .projectwiki/
+
+# Local implementation worktrees
+.worktrees/
