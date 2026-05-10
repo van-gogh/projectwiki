@@ -1,9 +1,13 @@
 import socket
+import sys
+import types
 
 from projectwiki.config import get_data_dir
 from projectwiki.runtime import (
     RuntimePaths,
+    append_runtime_log,
     choose_port,
+    clear_runtime_state,
     default_runtime_paths,
     read_log_tail,
     read_runtime_state,
@@ -21,6 +25,24 @@ def test_runtime_state_round_trip(tmp_path):
     assert state["host"] == "127.0.0.1"
     assert state["port"] == 8765
     assert state["pid"] == 1234
+    assert "started_at" in state
+
+
+def test_clear_runtime_state_removes_state_file(tmp_path):
+    paths = RuntimePaths(tmp_path)
+    write_runtime_state(paths, host="127.0.0.1", port=8765, pid=1234)
+
+    clear_runtime_state(paths)
+
+    assert read_runtime_state(paths) is None
+
+
+def test_append_runtime_log_creates_log_file(tmp_path):
+    paths = RuntimePaths(tmp_path)
+
+    append_runtime_log(paths, "ProjectWiki started")
+
+    assert "ProjectWiki started\n" in paths.log_path.read_text(encoding="utf-8")
 
 
 def test_default_runtime_paths_match_configured_data_dir(tmp_path, monkeypatch):
@@ -97,6 +119,63 @@ def test_log_command_prints_recent_lines(tmp_path, monkeypatch, capsys):
     assert main(["log", "--lines", "2"]) == 0
 
     assert capsys.readouterr().out == "two\nthree\n"
+
+
+def test_serve_writes_actual_runtime_state_and_log(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("projectwiki.cli.choose_port", lambda host, preferred: 9876)
+    calls = []
+
+    def record_run(app, host, port, reload):
+        state = read_runtime_state(RuntimePaths(tmp_path))
+        assert state is not None
+        assert state["host"] == "127.0.0.1"
+        assert state["port"] == 9876
+        calls.append({"app": app, "host": host, "port": port, "reload": reload})
+
+    fake_uvicorn = types.SimpleNamespace(
+        run=record_run
+    )
+    monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
+
+    assert main(["serve", "--host", "127.0.0.1", "--port", "8765"]) == 0
+
+    assert calls == [
+        {
+            "app": "projectwiki.app:app",
+            "host": "127.0.0.1",
+            "port": 9876,
+            "reload": False,
+        }
+    ]
+    assert read_runtime_state(RuntimePaths(tmp_path)) is None
+    output = capsys.readouterr().out
+    assert "Open: http://127.0.0.1:9876" in output
+    assert "Logs: projectwiki log" in output
+    log = RuntimePaths(tmp_path).log_path.read_text(encoding="utf-8")
+    assert "Starting ProjectWiki on http://127.0.0.1:9876" in log
+    assert "ProjectWiki server stopped." in log
+
+
+def test_serve_clears_runtime_state_when_uvicorn_raises(tmp_path, monkeypatch):
+    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("projectwiki.cli.choose_port", lambda host, preferred: 9877)
+
+    def raise_from_run(app, host, port, reload):
+        assert port == 9877
+        raise RuntimeError("server failed")
+
+    monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=raise_from_run))
+
+    try:
+        main(["serve", "--host", "127.0.0.1", "--port", "8765"])
+    except RuntimeError as exc:
+        assert str(exc) == "server failed"
+    else:
+        raise AssertionError("uvicorn failure was not propagated")
+
+    assert read_runtime_state(RuntimePaths(tmp_path)) is None
+    assert "ProjectWiki server stopped." in RuntimePaths(tmp_path).log_path.read_text(encoding="utf-8")
 
 
 def test_doctor_reports_runtime_files(tmp_path, monkeypatch, capsys):

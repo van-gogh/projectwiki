@@ -53,12 +53,6 @@ function main(argv) {
   const passthrough = defaultServe ? ["serve", "--host", "127.0.0.1", "--port", "8765"] : argv;
   const env = buildEnv(process.env);
 
-  if (defaultServe) {
-    console.log("ProjectWiki is running locally.");
-    console.log("Open: http://127.0.0.1:8765");
-    console.log("Logs: projectwiki log");
-  }
-
   run(0, passthrough, env);
 }
 

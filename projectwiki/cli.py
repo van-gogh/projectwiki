@@ -2,10 +2,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 
 from .db import init_db
-from .runtime import default_runtime_paths, read_log_tail, read_runtime_state
+from .runtime import (
+    append_runtime_log,
+    choose_port,
+    clear_runtime_state,
+    default_runtime_paths,
+    read_log_tail,
+    read_runtime_state,
+    write_runtime_state,
+)
 from .services.ask import ask_project
 from .services.ingest import ingest_path
 from .services.wiki_engine import build_project
@@ -79,8 +88,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "serve":
         import uvicorn
-        uvicorn.run("projectwiki.app:app", host=args.host, port=args.port, reload=False)
-        return 0
+        paths = default_runtime_paths()
+        port = choose_port(args.host, preferred=args.port)
+        url = f"http://{args.host}:{port}"
+        write_runtime_state(paths, host=args.host, port=port, pid=os.getpid())
+        append_runtime_log(paths, f"Starting ProjectWiki on {url}")
+        print("ProjectWiki is running locally.")
+        print(f"Open: {url}")
+        print("Logs: projectwiki log")
+        try:
+            uvicorn.run("projectwiki.app:app", host=args.host, port=port, reload=False)
+            return 0
+        finally:
+            append_runtime_log(paths, "ProjectWiki server stopped.")
+            clear_runtime_state(paths)
 
     if args.command == "status":
         state = read_runtime_state(default_runtime_paths())

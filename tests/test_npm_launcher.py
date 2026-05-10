@@ -35,12 +35,13 @@ def test_node_launcher_runs_python_cli_from_outside_repo(tmp_path):
     assert "projectwiki" in result.stdout
 
 
-def test_node_launcher_prints_default_startup_block_and_sets_data_dir():
+def test_node_launcher_delegates_default_startup_and_sets_data_dir():
     script = (ROOT / "npm" / "projectwiki.js").read_text(encoding="utf-8")
 
-    assert "ProjectWiki is running locally." in script
-    assert "Open: http://127.0.0.1:8765" in script
-    assert "Logs: projectwiki log" in script
+    assert '["serve", "--host", "127.0.0.1", "--port", "8765"]' in script
+    assert "ProjectWiki is running locally." not in script
+    assert "Open: http://127.0.0.1:8765" not in script
+    assert "Logs: projectwiki log" not in script
     assert "PROJECTWIKI_DATA_DIR" in script
     assert ".projectwiki" in script
     assert "homedir" in script
