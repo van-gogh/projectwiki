@@ -11,7 +11,7 @@ npm install -g projectwiki
 projectwiki
 ```
 
-The `projectwiki` command starts the local Web server quietly, chooses an available localhost port if needed, initializes the data directory, and prints a clickable link:
+The `projectwiki` command starts the local Web server quietly on the default local URL, initializes the data directory, and prints a clickable link:
 
 ```text
 ProjectWiki is running locally.
@@ -26,7 +26,7 @@ Data:
 ~/.projectwiki
 ```
 
-The command should be idempotent. If ProjectWiki is already running, it should not start a second server; it should show the existing URL and current status.
+The command should be idempotent. If ProjectWiki is already running, it should not start a second server; it should show the existing URL and current status. If `127.0.0.1:8765` is occupied by something else, startup should fail clearly instead of silently choosing another port.
 
 ## Launcher Commands
 

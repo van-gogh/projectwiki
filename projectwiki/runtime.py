@@ -6,9 +6,18 @@ import json
 import socket
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
 from .config import get_data_dir
+
+
+class PortInUseError(OSError):
+    def __init__(self, host: str, port: int):
+        super().__init__(EADDRINUSE, f"Port {host}:{port} is already in use")
+        self.host = host
+        self.port = port
 
 
 @dataclass(frozen=True)
@@ -48,7 +57,7 @@ def choose_port(host: str = "127.0.0.1", preferred: int = 8765) -> int:
         except OSError as exc:
             if exc.errno != EADDRINUSE:
                 raise
-            sock.bind((host, 0))
+            raise PortInUseError(host, preferred) from exc
         return int(sock.getsockname()[1])
 
 
@@ -81,6 +90,34 @@ def read_runtime_state(paths: RuntimePaths) -> dict[str, Any] | None:
         return json.loads(paths.state_path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
+
+
+def probe_projectwiki_server(state: dict[str, Any], timeout: float = 0.5) -> bool:
+    try:
+        host = str(state["host"])
+        port = int(state["port"])
+    except (KeyError, TypeError, ValueError):
+        return False
+
+    try:
+        with urlopen(f"http://{host}:{port}/", timeout=timeout) as response:
+            body = response.read(4096).decode("utf-8", errors="replace")
+    except (HTTPError, OSError, URLError, TimeoutError, ValueError):
+        return False
+    return "ProjectWiki" in body
+
+
+def read_active_runtime_state(
+    paths: RuntimePaths,
+    probe: Callable[[dict[str, Any]], bool] = probe_projectwiki_server,
+) -> dict[str, Any] | None:
+    state = read_runtime_state(paths)
+    if state is None:
+        return None
+    if probe(state):
+        return state
+    clear_runtime_state(paths)
+    return None
 
 
 def read_log_tail(paths: RuntimePaths, lines: int = 80) -> str:

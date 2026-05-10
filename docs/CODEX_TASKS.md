@@ -43,7 +43,7 @@ projectwiki
 
 - `projectwiki` 静默启动本地 Web 服务，并输出可点击链接。
 - 如果服务已启动，复用现有进程并输出当前 URL。
-- 默认使用 `127.0.0.1:8765`，端口被占用时自动选择可用端口。
+- 默认使用 `127.0.0.1:8765`；如果该端口被其它进程占用，启动应清晰失败，不自动 fallback 到随机端口。
 - 数据目录默认放在 `~/.projectwiki`。
 - 增加 `projectwiki log` 查看本次或最近一次启动日志。
 - 保留 `projectwiki status`、`open`、`stop`、`doctor` 的扩展空间。

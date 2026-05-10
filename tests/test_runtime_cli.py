@@ -4,11 +4,13 @@ import types
 
 from projectwiki.config import get_data_dir
 from projectwiki.runtime import (
+    PortInUseError,
     RuntimePaths,
     append_runtime_log,
     choose_port,
     clear_runtime_state,
     default_runtime_paths,
+    read_active_runtime_state,
     read_log_tail,
     read_runtime_state,
     write_runtime_state,
@@ -89,17 +91,29 @@ def test_choose_port_returns_requested_free_port():
     assert port > 0
 
 
-def test_choose_port_falls_back_when_preferred_port_is_occupied():
+def test_choose_port_refuses_occupied_preferred_port():
     host = "127.0.0.1"
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind((host, 0))
         occupied_port = int(sock.getsockname()[1])
 
-        port = choose_port(host, preferred=occupied_port)
+        try:
+            choose_port(host, preferred=occupied_port)
+        except PortInUseError as exc:
+            assert exc.host == host
+            assert exc.port == occupied_port
+        else:
+            raise AssertionError("occupied preferred port should not fall back")
 
-    assert isinstance(port, int)
-    assert port > 0
-    assert port != occupied_port
+
+def test_active_runtime_state_returns_none_and_clears_stale_state(tmp_path):
+    paths = RuntimePaths(tmp_path)
+    write_runtime_state(paths, host="127.0.0.1", port=8765, pid=1234)
+
+    state = read_active_runtime_state(paths, probe=lambda candidate: False)
+
+    assert state is None
+    assert read_runtime_state(paths) is None
 
 
 def test_status_reports_not_running_without_state(tmp_path, monkeypatch, capsys):
@@ -123,14 +137,14 @@ def test_log_command_prints_recent_lines(tmp_path, monkeypatch, capsys):
 
 def test_serve_writes_actual_runtime_state_and_log(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr("projectwiki.cli.choose_port", lambda host, preferred: 9876)
+    monkeypatch.setattr("projectwiki.cli.choose_port", lambda host, preferred: preferred)
     calls = []
 
     def record_run(app, host, port, reload):
         state = read_runtime_state(RuntimePaths(tmp_path))
         assert state is not None
         assert state["host"] == "127.0.0.1"
-        assert state["port"] == 9876
+        assert state["port"] == 8765
         calls.append({"app": app, "host": host, "port": port, "reload": reload})
 
     fake_uvicorn = types.SimpleNamespace(
@@ -144,25 +158,63 @@ def test_serve_writes_actual_runtime_state_and_log(tmp_path, monkeypatch, capsys
         {
             "app": "projectwiki.app:app",
             "host": "127.0.0.1",
-            "port": 9876,
+            "port": 8765,
             "reload": False,
         }
     ]
     assert read_runtime_state(RuntimePaths(tmp_path)) is None
     output = capsys.readouterr().out
-    assert "Open: http://127.0.0.1:9876" in output
+    assert "Open: http://127.0.0.1:8765" in output
     assert "Logs: projectwiki log" in output
     log = RuntimePaths(tmp_path).log_path.read_text(encoding="utf-8")
-    assert "Starting ProjectWiki on http://127.0.0.1:9876" in log
+    assert "Starting ProjectWiki on http://127.0.0.1:8765" in log
     assert "ProjectWiki server stopped." in log
+
+
+def test_serve_reuses_active_runtime_state_without_starting_second_server(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path))
+    write_runtime_state(RuntimePaths(tmp_path), host="127.0.0.1", port=8765, pid=1234)
+    monkeypatch.setattr("projectwiki.cli.read_active_runtime_state", lambda paths: {
+        "host": "127.0.0.1",
+        "port": 8765,
+        "pid": 1234,
+    })
+
+    def unexpected_run(*args, **kwargs):
+        raise AssertionError("serve should not start a second server")
+
+    monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=unexpected_run))
+
+    assert main(["serve", "--host", "127.0.0.1", "--port", "8765"]) == 0
+
+    output = capsys.readouterr().out
+    assert "ProjectWiki is already running locally." in output
+    assert "Open: http://127.0.0.1:8765" in output
+    assert "Logs: projectwiki log" in output
+
+
+def test_serve_refuses_occupied_port_without_fallback(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("projectwiki.cli.read_active_runtime_state", lambda paths: None)
+    monkeypatch.setattr(
+        "projectwiki.cli.choose_port",
+        lambda host, preferred: (_ for _ in ()).throw(PortInUseError(host, preferred)),
+    )
+
+    assert main(["serve", "--host", "127.0.0.1", "--port", "8765"]) == 2
+
+    captured = capsys.readouterr()
+    assert "Port 127.0.0.1:8765 is already in use." in captured.err
+    assert "ProjectWiki will not choose another port automatically." in captured.err
+    assert "Open:" not in captured.out
 
 
 def test_serve_clears_runtime_state_when_uvicorn_raises(tmp_path, monkeypatch):
     monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path))
-    monkeypatch.setattr("projectwiki.cli.choose_port", lambda host, preferred: 9877)
+    monkeypatch.setattr("projectwiki.cli.choose_port", lambda host, preferred: preferred)
 
     def raise_from_run(app, host, port, reload):
-        assert port == 9877
+        assert port == 8765
         raise RuntimeError("server failed")
 
     monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=raise_from_run))

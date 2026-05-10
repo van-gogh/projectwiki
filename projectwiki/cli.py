@@ -7,12 +7,13 @@ import sys
 
 from .db import init_db
 from .runtime import (
+    PortInUseError,
     append_runtime_log,
     choose_port,
     clear_runtime_state,
     default_runtime_paths,
+    read_active_runtime_state,
     read_log_tail,
-    read_runtime_state,
     write_runtime_state,
 )
 from .services.ask import ask_project
@@ -87,9 +88,26 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "serve":
-        import uvicorn
         paths = default_runtime_paths()
-        port = choose_port(args.host, preferred=args.port)
+        active_state = read_active_runtime_state(paths)
+        if active_state is not None:
+            url = f"http://{active_state['host']}:{active_state['port']}"
+            print("ProjectWiki is already running locally.")
+            print(f"Open: {url}")
+            print("Logs: projectwiki log")
+            return 0
+
+        try:
+            port = choose_port(args.host, preferred=args.port)
+        except PortInUseError:
+            print(f"Port {args.host}:{args.port} is already in use.", file=sys.stderr)
+            print("ProjectWiki will not choose another port automatically.", file=sys.stderr)
+            print("Stop the process using that port, or start ProjectWiki with an explicit --port.", file=sys.stderr)
+            append_runtime_log(paths, f"Port {args.host}:{args.port} is already in use; startup aborted.")
+            return 2
+
+        import uvicorn
+
         url = f"http://{args.host}:{port}"
         write_runtime_state(paths, host=args.host, port=port, pid=os.getpid())
         append_runtime_log(paths, f"Starting ProjectWiki on {url}")
@@ -104,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             clear_runtime_state(paths)
 
     if args.command == "status":
-        state = read_runtime_state(default_runtime_paths())
+        state = read_active_runtime_state(default_runtime_paths())
         print(json.dumps(state or {"running": False}, ensure_ascii=False, indent=2))
         return 0
 
@@ -122,7 +140,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "open":
-        state = read_runtime_state(default_runtime_paths()) or {}
+        state = read_active_runtime_state(default_runtime_paths()) or {}
         url = f"http://{state.get('host', '127.0.0.1')}:{state.get('port', 8765)}"
         print(url)
         return 0

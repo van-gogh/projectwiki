@@ -39,7 +39,7 @@ npm install -g projectwiki
 projectwiki
 ```
 
-`projectwiki` starts the local Web app quietly, initializes the data directory, selects an available localhost port, and prints a clickable link:
+`projectwiki` starts the local Web app quietly, initializes the data directory, uses the default local URL, and prints a clickable link:
 
 ```text
 ProjectWiki is running locally.
@@ -76,7 +76,7 @@ Launcher behavior:
 - default host is `127.0.0.1`
 - default port is `8765`
 - if the port is occupied by a running ProjectWiki instance, reuse it
-- if the port is occupied by another process, choose a free port and record it
+- if the port is occupied by another process, fail clearly and do not choose a random fallback port
 - default data directory is `~/.projectwiki`
 - logs are written to `~/.projectwiki/logs/projectwiki.log`
 - pid and runtime metadata are written under `~/.projectwiki/run/`
