@@ -1,0 +1,22 @@
+{
+  "name": "projectwiki",
+  "version": "0.1.0",
+  "description": "Local-first project memory and AI-maintained wiki for messy software projects.",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "projectwiki": "npm/projectwiki.js"
+  },
+  "files": [
+    "npm",
+    "projectwiki",
+    "!projectwiki/**/__pycache__/",
+    "!projectwiki/**/*.pyc",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
