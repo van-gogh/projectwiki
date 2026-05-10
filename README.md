@@ -43,7 +43,30 @@ Not yet implemented deeply:
 - advanced AST analysis beyond Python basics
 - async worker queue
 
-## Quick start
+## Product startup target
+
+The intended first-board product flow is:
+
+```bash
+npm install -g projectwiki
+projectwiki
+```
+
+`projectwiki` should quietly start the local Web app and print a clickable local URL:
+
+```text
+ProjectWiki is running locally.
+
+Open:
+http://127.0.0.1:8765
+
+Logs:
+projectwiki log
+```
+
+All normal work should happen in the Web dashboard after startup. `projectwiki log` should show the current or most recent startup logs.
+
+## Current developer setup
 
 ```bash
 python -m venv .venv
@@ -59,7 +82,7 @@ projectwiki serve
 
 Open <http://localhost:8080>.
 
-## Docker
+## Docker developer setup
 
 ```bash
 docker compose up --build

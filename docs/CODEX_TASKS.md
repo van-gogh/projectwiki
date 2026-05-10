@@ -28,6 +28,28 @@ projectwiki create "Demo Project"
 
 验收：命令无错误。
 
+## Task 0.5：产品化启动入口
+
+目标：让 ProjectWiki 像现代 CLI 产品一样从一行命令进入 Web 工作台，而不是要求用户先 clone 仓库。
+
+目标入口：
+
+```bash
+npm install -g projectwiki
+projectwiki
+```
+
+要求：
+
+- `projectwiki` 静默启动本地 Web 服务，并输出可点击链接。
+- 如果服务已启动，复用现有进程并输出当前 URL。
+- 默认使用 `127.0.0.1:8765`，端口被占用时自动选择可用端口。
+- 数据目录默认放在 `~/.projectwiki`。
+- 增加 `projectwiki log` 查看本次或最近一次启动日志。
+- 保留 `projectwiki status`、`open`、`stop`、`doctor` 的扩展空间。
+
+验收：用户不需要 clone 仓库、不需要理解 Python/Docker，也能打开可用 Web 界面；启动失败时能通过 `projectwiki log` 定位原因。
+
 ## Task 1：强化数据模型与 schema
 
 目标：让 Project / Source / Block / Fact / Conflict / WikiPage 的字段更稳定。
@@ -109,6 +131,8 @@ projectwiki create "Demo Project"
 
 目标：从静态占位页升级为轻量工作台。
 
+设计方向：参考 `npx getdesign@latest add airtable` 的 Airtable/Equals 风格，做成仪表板式本地工作台，而不是说明页或 landing page。
+
 页面：
 
 - Projects
@@ -120,7 +144,7 @@ projectwiki create "Demo Project"
 - Ask
 - Settings
 
-验收：不用命令行也能完成首板闭环。
+验收：执行 `projectwiki` 后进入 Web UI，不用命令行也能完成首板闭环；启动或摄入失败时，界面应提示用户可运行 `projectwiki log` 查看日志。
 
 ## Task 7：示例项目和 README 传播
 

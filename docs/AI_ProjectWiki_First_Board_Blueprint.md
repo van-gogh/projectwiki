@@ -451,13 +451,15 @@ Markdown 是渲染结果。
 
 首板继续开发的优先级：
 
-1. Parser 稳定性
-2. Fact schema 和 LLM JSON 抽取
-3. 冲突检测规则
-4. Wiki 页面质量
-5. Web UI 工作台
-6. Demo 项目和 README 动图
-7. Docker 一键运行
+1. npm-first 本地启动入口：`projectwiki`
+2. Web UI 工作台
+3. `projectwiki log` 启动日志入口
+4. Parser 稳定性
+5. Fact schema 和 LLM JSON 抽取
+6. 冲突检测规则
+7. Wiki 页面质量
+8. Demo 项目和 README 动图
+9. Docker / pip 开发者入口
 
 ### 7.3 后续再补，不要首板过早做
 
@@ -593,7 +595,44 @@ POST   /api/projects/{project_id}/ask
 
 ---
 
-## 10. CLI 设计草案
+## 10. 启动与 CLI 设计草案
+
+首板的产品入口不应该要求用户 clone 仓库或理解 Docker。默认入口应该像现代 CLI 产品：
+
+```bash
+npm install -g projectwiki
+projectwiki
+```
+
+`projectwiki` 静默启动本地 Web 服务，初始化数据目录，选择可用端口，并输出可点击链接：
+
+```text
+ProjectWiki is running locally.
+
+Open:
+http://127.0.0.1:8765
+
+Logs:
+projectwiki log
+
+Data:
+~/.projectwiki
+```
+
+必须支持的产品化命令：
+
+```bash
+projectwiki          # 静默启动本地 Web，并输出 URL
+projectwiki open     # 打开当前 Web UI
+projectwiki status   # 查看运行状态、端口、版本和数据目录
+projectwiki log      # 查看本次或最近一次启动日志
+projectwiki stop     # 停止后台服务
+projectwiki doctor   # 检查端口、运行时和数据目录问题
+```
+
+`projectwiki log` 是首板可用性的一部分。用户启动失败时不应该被要求理解 uvicorn、Docker、进程 ID 或日志重定向位置。
+
+开发者入口保留当前命令：
 
 ```bash
 projectwiki init-db
@@ -846,14 +885,14 @@ Demo 展示顺序：
 ## 16. 设计原则
 
 1. 开源优先，而不是商业化优先。
-2. Web / Docker 优先，而不是桌面端优先。
+2. npm-first 本地 Web App 优先，而不是源码 clone 优先。
 3. 小团队优先，而不是企业采购优先。
 4. 事实层优先，而不是 Markdown 优先。
 5. 可追溯优先，而不是“AI 说了算”。
 6. 冲突显式化，而不是掩盖矛盾。
 7. 局部关系视图优先，而不是全局大图谱。
 8. 复用 Git / Gitea / 飞书 / Confluence，而不是替代它们。
-9. CLI 是开发者入口，Web UI 是团队工作台。
+9. CLI 负责启动和诊断，Web UI 是团队工作台。
 10. 首板做完整骨架，不做企业级深度。
 
 ---
@@ -874,9 +913,13 @@ Demo 展示顺序：
 
 ### 风险 4：Web UI 工程拖慢进度
 
-应对：首板先静态 UI + API，后续再做 React/Next.js。
+应对：首板先做高质量单页 dashboard + API，样式参考 Airtable/Equals 工作台；复杂前端工程后续再引入。
 
-### 风险 5：开源传播点不够强
+### 风险 5：启动方式仍然像开发者工具
+
+应对：首板把 `npm install -g projectwiki` 和 `projectwiki` 作为产品入口；Docker、pip、源码 clone 降级为开发者入口。增加 `projectwiki log`，让用户可以直接查看本次启动日志。
+
+### 风险 6：开源传播点不够强
 
 应对：Demo 必须展示“文档-代码冲突检测”和“一键交接包”。
 
@@ -884,10 +927,11 @@ Demo 展示顺序：
 
 ## 18. 首板验收标准
 
-一个陌生开发者 clone 项目后，可以在 10 分钟内完成：
+一个陌生用户安装后，可以在 3 分钟内完成：
 
 ```bash
-docker compose up --build
+npm install -g projectwiki
+projectwiki
 ```
 
 然后：
@@ -899,6 +943,14 @@ docker compose up --build
 5. 看到冲突列表。
 6. 看到交接包。
 7. 在 Ask 里问问题，并得到带证据回答。
+
+如果启动失败，用户可以运行：
+
+```bash
+projectwiki log
+```
+
+查看本次或最近一次启动日志。
 
 首板成功的标志不是功能多，而是用户看完 Demo 后理解：
 
@@ -914,4 +966,3 @@ docker compose up --build
 1. 用 starter zip 跑通本地 demo。
 2. 让 Codex 按 `docs/CODEX_TASKS.md` 逐个任务改。
 3. 尽快做 README + Demo GIF，因为开源项目的第一印象非常关键。
-
