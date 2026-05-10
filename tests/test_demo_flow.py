@@ -5,6 +5,15 @@ from projectwiki.app import app
 from projectwiki.services.workspace import list_projects
 
 
+def test_demo_project_root_uses_packaged_demo_assets():
+    root = app_module.demo_project_root()
+
+    assert root.name == "demo_project"
+    assert "examples" not in root.parts
+    assert root.is_dir()
+    assert (root / "README.md").is_file()
+
+
 def test_demo_api_creates_ingests_and_builds_project(tmp_path, monkeypatch):
     monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
 

@@ -120,3 +120,22 @@ def test_npm_pack_dry_run_excludes_generated_python_artifacts(tmp_path):
 
     assert not any("__pycache__" in path for path in paths)
     assert not any(path.endswith(".pyc") for path in paths)
+
+
+def test_npm_pack_dry_run_includes_packaged_demo_assets(tmp_path):
+    result = subprocess.run(
+        ["npm", "--cache", str(tmp_path / "npm-cache"), "pack", "--dry-run", "--json"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    [package] = json.loads(result.stdout)
+    paths = {entry["path"] for entry in package["files"]}
+
+    assert "projectwiki/demo_project/README.md" in paths
+    assert "projectwiki/demo_project/docs/需求_latest.md" in paths
+    assert "projectwiki/demo_project/experiments/model_eval.csv" in paths
+    assert "examples/demo-project/README.md" not in paths
