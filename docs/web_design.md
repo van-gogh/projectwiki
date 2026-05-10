@@ -26,7 +26,11 @@ Data:
 ~/.projectwiki
 ```
 
-The command should be idempotent. If ProjectWiki is already running, it should not start a second server; it should show the existing URL and current status. If `127.0.0.1:8765` is occupied by something else, startup should fail clearly instead of silently choosing another port.
+The command should be idempotent and explicit:
+
+- If ProjectWiki is already running on the port, show the current port, process id, startup metadata, and let the user choose whether to continue using it or restart ProjectWiki.
+- If another process is using the port, show the process information and let the user choose whether to kill that process and start ProjectWiki or cancel startup.
+- The launcher must not silently choose a random fallback port.
 
 ## Launcher Commands
 

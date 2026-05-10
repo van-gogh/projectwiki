@@ -75,8 +75,9 @@ Launcher behavior:
 
 - default host is `127.0.0.1`
 - default port is `8765`
-- if the port is occupied by a running ProjectWiki instance, reuse it
-- if the port is occupied by another process, fail clearly and do not choose a random fallback port
+- if the port is occupied by a running ProjectWiki instance, show the current port, process id, startup information, and ask whether to continue using it or restart ProjectWiki
+- if the port is occupied by another process, show the process information and ask whether to kill that process and start ProjectWiki or cancel startup
+- the launcher must not choose a random fallback port automatically
 - default data directory is `~/.projectwiki`
 - logs are written to `~/.projectwiki/logs/projectwiki.log`
 - pid and runtime metadata are written under `~/.projectwiki/run/`

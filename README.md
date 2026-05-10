@@ -64,7 +64,7 @@ Logs:
 projectwiki log
 ```
 
-All normal work should happen in the Web dashboard after startup. `projectwiki log` should show the current or most recent startup logs.
+All normal work should happen in the Web dashboard after startup. `projectwiki log` should show the current or most recent startup logs. If the default port is already in use, ProjectWiki prints the current process information and asks whether to continue, restart, kill the occupying process, or cancel instead of silently switching ports.
 
 Open the printed local URL, click `Use demo project`, then inspect Conflicts, Wiki, Handover, and Ask with evidence.
 
