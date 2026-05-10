@@ -115,7 +115,9 @@ def render_fact_page(title: str, facts) -> str:
         pointer = evidence[0]["path"] if evidence else "unknown"
         lines.append(f"- {fact['statement']}")
         lines.append(f"  - 证据：`{pointer}`")
-        lines.append(f"  - 状态：{fact['status']}，置信度：{fact['confidence']:.2f}")
+        status = fact["status"]
+        validity = fact["validity_status"] if "validity_status" in fact.keys() else "unknown"
+        lines.append(f"  - 状态：{status}，有效性：{validity}，置信度：{fact['confidence']:.2f}")
     return "\n".join(lines).strip() + "\n"
 
 

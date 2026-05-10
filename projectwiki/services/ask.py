@@ -6,6 +6,19 @@ import sqlite3
 from ..db import connect, init_db
 from ..utils import from_json
 
+MIN_TOKEN_OVERLAP = 2
+HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
+PRICING_INTENT_TERMS = (
+    "预算",
+    "收费",
+    "费用",
+    "价格",
+    "budget",
+    "cost",
+    "pricing",
+    "price",
+)
+
 
 def tokenize(text: str) -> set[str]:
     # Works for English and coarse Chinese matching through character ngrams.
@@ -15,11 +28,34 @@ def tokenize(text: str) -> set[str]:
     return words
 
 
+def has_pricing_intent(text: str) -> bool:
+    lower = text.lower()
+    return any(term in lower for term in PRICING_INTENT_TERMS)
+
+
+def is_api_evidence(row, tokens: set[str]) -> bool:
+    block_type = row["block_type"] if "block_type" in row.keys() else ""
+    fact_type = row["fact_type"] if "fact_type" in row.keys() else ""
+    return fact_type == "api" or "endpoint" in block_type or bool(HTTP_METHODS & tokens)
+
+
+def should_include_candidate(question_tokens: set[str], candidate_tokens: set[str], score: float, row) -> bool:
+    overlap = len(question_tokens & candidate_tokens)
+    if question_tokens <= HTTP_METHODS:
+        return bool(question_tokens & candidate_tokens) and is_api_evidence(row, candidate_tokens)
+    if overlap >= MIN_TOKEN_OVERLAP:
+        return True
+    if len(question_tokens) == 1 and overlap == 1:
+        return True
+    return score >= MIN_TOKEN_OVERLAP
+
+
 def ask_project(project_id: str, question: str, conn: sqlite3.Connection | None = None, limit: int = 6) -> dict:
     close = conn is None
     conn = conn or connect()
     init_db(conn)
     q_tokens = tokenize(question)
+    requires_pricing_evidence = has_pricing_intent(question)
 
     candidates = []
     for row in conn.execute(
@@ -29,9 +65,11 @@ def ask_project(project_id: str, question: str, conn: sqlite3.Connection | None 
         """,
         (project_id,),
     ).fetchall():
+        if requires_pricing_evidence and not has_pricing_intent(row["statement"]):
+            continue
         tokens = tokenize(row["statement"])
         score = len(q_tokens & tokens) + float(row["confidence"])
-        if score > 0:
+        if should_include_candidate(q_tokens, tokens, score, row):
             candidates.append((score, "fact", row))
 
     for row in conn.execute(
@@ -42,9 +80,11 @@ def ask_project(project_id: str, question: str, conn: sqlite3.Connection | None 
         """,
         (project_id,),
     ).fetchall():
+        if requires_pricing_evidence and not has_pricing_intent(row["text"]):
+            continue
         tokens = tokenize(row["text"])
         score = len(q_tokens & tokens)
-        if score > 0:
+        if should_include_candidate(q_tokens, tokens, score, row):
             candidates.append((score, "block", row))
 
     candidates.sort(key=lambda x: x[0], reverse=True)
