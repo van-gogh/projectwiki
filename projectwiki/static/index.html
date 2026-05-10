@@ -10,19 +10,19 @@
   <aside class="sidebar">
     <div class="brand">ProjectWiki</div>
     <nav>
-      <button data-i18n="nav.projects"></button>
-      <button data-i18n="nav.sources"></button>
-      <button data-i18n="nav.facts"></button>
-      <button data-i18n="nav.wiki"></button>
-      <button data-i18n="nav.conflicts"></button>
-      <button data-i18n="nav.handover"></button>
-      <button data-i18n="nav.ask"></button>
-      <button data-i18n="nav.settings"></button>
+      <button data-i18n="nav.projects">Projects</button>
+      <button data-i18n="nav.sources">Sources</button>
+      <button data-i18n="nav.facts">Facts</button>
+      <button data-i18n="nav.wiki">Wiki</button>
+      <button data-i18n="nav.conflicts">Conflicts</button>
+      <button data-i18n="nav.handover">Handover</button>
+      <button data-i18n="nav.ask">Ask</button>
+      <button data-i18n="nav.settings">Settings</button>
     </nav>
   </aside>
   <main class="workspace">
     <header class="topbar">
-      <input id="search" placeholder="Search project memory" />
+      <input id="search" placeholder="Search project memory" data-i18n-placeholder="search.placeholder" />
       <div class="language-switch">
         <button data-lang="zh-CN">中文</button>
         <button data-lang="en-US">EN</button>
@@ -30,12 +30,12 @@
     </header>
     <section class="dashboard">
       <div class="panel">
-        <h1>Project Memory</h1>
+        <h1 data-i18n="dashboard.title">Project Memory</h1>
         <div class="actions">
-          <button class="primary" data-i18n="action.useDemo"></button>
-          <button data-i18n="action.createProject"></button>
-          <button data-i18n="action.ingest"></button>
-          <button data-i18n="action.buildWiki"></button>
+          <button class="primary" data-i18n="action.useDemo">Use demo project</button>
+          <button data-i18n="action.createProject">Create project</button>
+          <button data-i18n="action.ingest">Ingest local folder</button>
+          <button data-i18n="action.buildWiki">Build wiki</button>
         </div>
       </div>
       <div id="app"></div>

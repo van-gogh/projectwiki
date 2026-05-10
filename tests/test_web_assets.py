@@ -1,22 +1,132 @@
 from pathlib import Path
+from html.parser import HTMLParser
+import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "projectwiki" / "static"
 
 
-def test_dashboard_assets_exist():
+class DashboardParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.i18n_keys = set()
+        self.placeholder_keys = set()
+        self.stylesheets = []
+        self.scripts = []
+        self.button_stack = []
+        self.i18n_buttons = []
+
+    def handle_starttag(self, tag, attrs):
+        attr_map = dict(attrs)
+        if "data-i18n" in attr_map:
+            self.i18n_keys.add(attr_map["data-i18n"])
+        if "data-i18n-placeholder" in attr_map:
+            self.placeholder_keys.add(attr_map["data-i18n-placeholder"])
+        if tag == "link" and attr_map.get("rel") == "stylesheet":
+            self.stylesheets.append(attr_map["href"])
+        if tag == "script" and "src" in attr_map:
+            self.scripts.append(attr_map["src"])
+        if tag == "button":
+            self.button_stack.append(
+                {
+                    "data_i18n": attr_map.get("data-i18n"),
+                    "text": "",
+                }
+            )
+
+    def handle_data(self, data):
+        if self.button_stack:
+            self.button_stack[-1]["text"] += data
+
+    def handle_endtag(self, tag):
+        if tag == "button" and self.button_stack:
+            button = self.button_stack.pop()
+            if button["data_i18n"]:
+                self.i18n_buttons.append(button)
+
+
+def parse_dashboard():
+    parser = DashboardParser()
+    parser.feed((STATIC / "index.html").read_text(encoding="utf-8"))
+    return parser
+
+
+def parse_i18n_keys():
+    content = (STATIC / "i18n.js").read_text(encoding="utf-8")
+    languages = {}
+    for language in ("zh-CN", "en-US"):
+        match = re.search(rf'"{re.escape(language)}":\s*\{{(?P<body>.*?)\n  \}}', content, re.S)
+        assert match, f"Missing {language} dictionary"
+        languages[language] = set(re.findall(r'"([^"]+)":', match.group("body")))
+    return languages
+
+
+def static_url_exists(url):
+    assert url.startswith("/static/")
+    return (STATIC / url.removeprefix("/static/")).exists()
+
+
+def test_dashboard_asset_references_exist():
+    parser = parse_dashboard()
+
     assert (STATIC / "index.html").exists()
     assert (STATIC / "styles.css").exists()
     assert (STATIC / "app.js").exists()
     assert (STATIC / "i18n.js").exists()
+    assert parser.stylesheets == ["/static/styles.css"]
+    assert parser.scripts == ["/static/i18n.js", "/static/app.js"]
+    for href in parser.stylesheets:
+        assert static_url_exists(href)
+    for src in parser.scripts:
+        assert static_url_exists(src)
 
 
-def test_i18n_contains_chinese_and_english_keys():
+def test_i18n_contains_all_dashboard_keys_for_each_language():
+    parser = parse_dashboard()
+    keys = parser.i18n_keys | parser.placeholder_keys
+    languages = parse_i18n_keys()
+
+    assert "nav.projects" in keys
+    assert "action.buildWiki" in keys
+    assert "search.placeholder" in keys
+    assert "dashboard.title" in keys
+    for language, language_keys in languages.items():
+        assert not keys - language_keys, f"{language} missing keys: {sorted(keys - language_keys)}"
+
+
+def test_i18n_contains_chinese_and_english_dictionaries():
     content = (STATIC / "i18n.js").read_text(encoding="utf-8")
 
     assert "zh-CN" in content
     assert "en-US" in content
-    assert "nav.projects" in content
-    assert "action.buildWiki" in content
     assert "error.readLogs" in content
+
+
+def test_i18n_buttons_have_english_fallback_labels():
+    parser = parse_dashboard()
+
+    assert parser.i18n_buttons
+    for button in parser.i18n_buttons:
+        assert button["text"].strip(), f"Missing fallback label for {button['data_i18n']}"
+
+
+def test_app_js_handles_unavailable_storage_and_bad_language_data():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "function storageGet" in content
+    assert "function storageSet" in content
+    assert "try {" in content
+    assert "catch" in content
+    assert "function normalizeLanguage" in content
+    assert 'dictionaries["en-US"] || {}' in content
+    assert "data-i18n-placeholder" in content
+
+
+def test_styles_include_mobile_overflow_guards():
+    content = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+    assert "@media (max-width: 720px)" in content
+    assert "min-width: 0;" in content
+    assert "flex-wrap: wrap;" in content
+    assert "display: block;" in content
