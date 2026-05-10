@@ -11,6 +11,7 @@ from ..utils import from_json, new_id, now_iso, to_json
 ENDPOINT_RE = re.compile(r"\b(GET|POST|PUT|PATCH|DELETE)\s+(/[A-Za-z0-9_/{}/.:-]+)", re.IGNORECASE)
 FILE_MENTION_RE = re.compile(r"\b[\w./-]+\.(?:py|sh|yaml|yml|json|toml|md|sql)\b")
 MODEL_WORDS = ["LSTM", "Transformer", "BERT", "CNN", "RNN", "XGBoost", "LightGBM"]
+MODEL_VERSION_RE = re.compile(r"\bmodel[_-]?v?(\d+)(?:\.pkl)?\b|\bv(\d+)\b", re.IGNORECASE)
 LATEST_HINTS = ["latest", "最新版", "最终版", "final", "current", "当前版本"]
 
 
@@ -25,6 +26,7 @@ def detect_conflicts(project_id: str, conn: sqlite3.Connection | None = None) ->
     inserted += detect_endpoint_conflicts(project_id, conn)
     inserted += detect_model_term_conflicts(project_id, conn)
     inserted += detect_missing_file_mentions(project_id, conn)
+    inserted += detect_deployment_model_mismatch(project_id, conn)
 
     conn.commit()
     if close:
@@ -177,3 +179,82 @@ def detect_missing_file_mentions(project_id: str, conn: sqlite3.Connection) -> i
         "low",
     )
     return 1
+
+
+def extract_model_identifiers(text: str) -> set[str]:
+    identifiers = set()
+    lower = text.lower()
+    for word in MODEL_WORDS:
+        if word.lower() in lower:
+            identifiers.add(word.lower())
+    for match in MODEL_VERSION_RE.finditer(text):
+        version = match.group(1) or match.group(2)
+        identifiers.add(f"v{version}")
+    return identifiers
+
+
+def model_identifier_groups(identifiers: set[str]) -> dict[str, set[str]]:
+    architecture_words = {word.lower() for word in MODEL_WORDS}
+    return {
+        "architectures": identifiers & architecture_words,
+        "versions": {identifier for identifier in identifiers if re.fullmatch(r"v\d+", identifier)},
+    }
+
+
+def has_model_identifier_mismatch(deployed_identifiers: set[str], candidate_identifiers: set[str]) -> bool:
+    if not deployed_identifiers or not candidate_identifiers:
+        return False
+    deployed_groups = model_identifier_groups(deployed_identifiers)
+    candidate_groups = model_identifier_groups(candidate_identifiers)
+    for group_name, deployed_values in deployed_groups.items():
+        candidate_values = candidate_groups[group_name]
+        if deployed_values and candidate_values and deployed_values != candidate_values:
+            return True
+    return False
+
+
+def detect_deployment_model_mismatch(project_id: str, conn: sqlite3.Connection) -> int:
+    rows = conn.execute(
+        """
+        SELECT b.id AS block_id, b.text, s.id AS source_id, s.path
+        FROM blocks b JOIN sources s ON s.id = b.source_id
+        WHERE b.project_id = ?
+        """,
+        (project_id,),
+    ).fetchall()
+    deployment_hits = []
+    experiment_hits = []
+    for r in rows:
+        text = r["text"]
+        lower = text.lower()
+        model_identifiers = extract_model_identifiers(text)
+        if not model_identifiers:
+            continue
+        evidence = {
+            "source_id": r["source_id"],
+            "block_id": r["block_id"],
+            "path": r["path"],
+            "model_identifiers": sorted(model_identifiers),
+        }
+        if any(k in lower for k in ["deploy", "deployment", "production", "部署", "线上"]):
+            deployment_hits.append(evidence)
+        if any(k in lower for k in ["experiment", "candidate", "f1", "accuracy", "实验"]):
+            experiment_hits.append(evidence)
+    deployed_identifiers = {identifier for hit in deployment_hits for identifier in hit["model_identifiers"]}
+    candidate_identifiers = {identifier for hit in experiment_hits for identifier in hit["model_identifiers"]}
+    if has_model_identifier_mismatch(deployed_identifiers, candidate_identifiers):
+        insert_conflict(
+            conn,
+            project_id,
+            "deployment_model_mismatch",
+            "部署材料与实验/候选模型记录可能不一致",
+            (
+                "部署材料与实验/候选材料提到的模型标识不一致，"
+                f"部署侧为 {', '.join(sorted(deployed_identifiers))}，"
+                f"候选侧为 {', '.join(sorted(candidate_identifiers))}，需要确认线上有效模型。"
+            ),
+            deployment_hits[:3] + experiment_hits[:3],
+            "medium",
+        )
+        return 1
+    return 0
