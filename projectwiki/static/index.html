@@ -24,7 +24,7 @@
   <main class="workspace">
     <header class="topbar">
       <input id="search" placeholder="Search project memory" data-i18n-placeholder="search.placeholder" />
-      <div class="language-switch">
+      <div class="language-switch" data-active-lang="en-US" aria-label="Language">
         <button data-lang="zh-CN">中文</button>
         <button data-lang="en-US">EN</button>
       </div>
@@ -33,10 +33,10 @@
       <div class="panel">
         <h1 data-i18n="dashboard.title">Project Memory</h1>
         <div class="actions">
-          <button class="primary" data-i18n="action.useDemo">Use demo project</button>
-          <button data-i18n="action.createProject">Create project</button>
-          <button data-i18n="action.ingest">Ingest local folder</button>
-          <button data-i18n="action.buildWiki">Build wiki</button>
+          <button class="primary" data-action="useDemo" data-i18n="action.useDemo">Use demo project</button>
+          <button data-action="createProject" data-i18n="action.createProject">Create project</button>
+          <button data-action="ingest" data-i18n="action.ingest">Ingest local folder</button>
+          <button data-action="buildWiki" data-i18n="action.buildWiki">Build wiki</button>
         </div>
       </div>
       <div id="app"></div>

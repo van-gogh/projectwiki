@@ -1,5 +1,6 @@
 const supportedLanguages = ["zh-CN", "en-US"];
 let currentProjectId = storageGet("projectwiki.currentProjectId");
+let languageBounceTimer = null;
 
 function dictionary() {
   const dictionaries = window.ProjectWikiI18n || {};
@@ -34,7 +35,22 @@ function normalizeLanguage(lang) {
 function initialLanguage() {
   const saved = storageGet("projectwiki.language");
   if (supportedLanguages.includes(saved)) return saved;
-  return navigator.language && navigator.language.startsWith("zh") ? "zh-CN" : "en-US";
+  return typeof navigator !== "undefined" && navigator.language && navigator.language.startsWith("zh") ? "zh-CN" : "en-US";
+}
+
+function updateLanguageSwitch(lang) {
+  const switcher = document.querySelector(".language-switch");
+  if (!switcher) return;
+  switcher.dataset.activeLang = lang;
+  switcher.querySelectorAll("[data-lang]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.lang === lang));
+  });
+  switcher.classList.remove("is-bouncing");
+  window.requestAnimationFrame(() => {
+    switcher.classList.add("is-bouncing");
+    clearTimeout(languageBounceTimer);
+    languageBounceTimer = setTimeout(() => switcher.classList.remove("is-bouncing"), 360);
+  });
 }
 
 function translate(lang) {
@@ -48,6 +64,7 @@ function translate(lang) {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.placeholder = dict[node.dataset.i18nPlaceholder] || node.dataset.i18nPlaceholder;
   });
+  updateLanguageSwitch(normalizedLang);
   storageSet("projectwiki.language", normalizedLang);
 }
 
@@ -149,6 +166,30 @@ function createPanel(titleText) {
   return panel;
 }
 
+function createFormPanel(titleText) {
+  const panel = createPanel(titleText);
+  panel.classList.add("form-panel");
+  return panel;
+}
+
+function appendLabeledControl(form, labelText, control) {
+  const label = document.createElement("label");
+  const text = document.createElement("span");
+  text.textContent = labelText;
+  label.append(text, control);
+  form.append(label);
+  return control;
+}
+
+function renderProjectReady(project, titleKey = "project.create.ready") {
+  const panel = createPanel(t(titleKey));
+  appendField(panel, t("field.projectId"), project.id);
+  appendField(panel, t("project.create.name"), project.name);
+  appendField(panel, t("project.create.description"), project.description || "-");
+  appendActionButtons(panel);
+  return panel;
+}
+
 function renderEmpty(panel) {
   const empty = document.createElement("p");
   empty.className = "muted";
@@ -240,6 +281,159 @@ function renderDemoResult(payload) {
   container.append(title, fields, nextSteps);
   appendActionButtons(container);
   return container;
+}
+
+function showCreateProjectForm() {
+  const appNode = appContainer();
+  if (!appNode) return;
+  setActiveView("");
+
+  const panel = createFormPanel(t("project.create.title"));
+  const form = document.createElement("form");
+  form.className = "inline-form";
+  const nameInput = document.createElement("input");
+  nameInput.name = "name";
+  nameInput.required = true;
+  nameInput.placeholder = t("project.create.namePlaceholder");
+  const descriptionInput = document.createElement("textarea");
+  descriptionInput.name = "description";
+  descriptionInput.placeholder = t("project.create.descriptionPlaceholder");
+  const status = document.createElement("p");
+  status.className = "status-line";
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "primary";
+  submit.textContent = t("project.create.submit");
+
+  appendLabeledControl(form, t("project.create.name"), nameInput);
+  appendLabeledControl(form, t("project.create.description"), descriptionInput);
+  form.append(submit, status);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.textContent = t("view.loading");
+    try {
+      const project = await api("/api/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          name: nameInput.value.trim(),
+          description: descriptionInput.value.trim(),
+        }),
+      });
+      setCurrentProjectId(project.id);
+      appNode.replaceChildren(renderProjectReady(project));
+    } catch (error) {
+      status.textContent = `${t("view.error")}: ${error.message}`;
+    }
+  });
+
+  panel.append(form);
+  appNode.replaceChildren(panel);
+  nameInput.focus();
+}
+
+function renderNoProjectAction() {
+  const panel = createPanel(t("dashboard.title"));
+  const message = document.createElement("p");
+  message.textContent = t("view.noProject");
+  const createButton = document.createElement("button");
+  createButton.type = "button";
+  createButton.className = "primary";
+  createButton.textContent = t("action.createProject");
+  createButton.addEventListener("click", showCreateProjectForm);
+  panel.append(message, createButton);
+  return panel;
+}
+
+function showIngestForm() {
+  const appNode = appContainer();
+  if (!appNode) return;
+  setActiveView("");
+  const projectId = requireProject();
+  if (!projectId) {
+    appNode.replaceChildren(renderNoProjectAction());
+    return;
+  }
+
+  const panel = createFormPanel(t("ingest.title"));
+  const form = document.createElement("form");
+  form.className = "inline-form";
+  const pathInput = document.createElement("input");
+  pathInput.name = "path";
+  pathInput.required = true;
+  pathInput.placeholder = t("ingest.pathPlaceholder");
+  const sourceType = document.createElement("select");
+  ["local", "git"].forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    sourceType.append(option);
+  });
+  const status = document.createElement("p");
+  status.className = "status-line";
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "primary";
+  submit.textContent = t("ingest.submit");
+
+  appendLabeledControl(form, t("ingest.path"), pathInput);
+  appendLabeledControl(form, t("ingest.sourceType"), sourceType);
+  form.append(submit, status);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    status.textContent = t("view.loading");
+    try {
+      const result = await api(`/api/projects/${projectId}/ingest`, {
+        method: "POST",
+        body: JSON.stringify({
+          path: pathInput.value.trim(),
+          source_type: sourceType.value,
+        }),
+      });
+      const resultPanel = createPanel(t("ingest.ready"));
+      appendField(resultPanel, t("field.projectId"), result.project_id);
+      appendField(resultPanel, t("field.filesSeen"), result.files_seen);
+      appendField(resultPanel, t("field.sourcesCreated"), result.created_sources);
+      appendField(resultPanel, t("demo.blocksCreated"), result.created_blocks);
+      appendField(resultPanel, t("field.skippedFiles"), result.skipped_files);
+      if (result.errors && result.errors.length) {
+        appendField(resultPanel, t("view.error"), result.errors.length);
+        appendPre(resultPanel, result.errors);
+      }
+      appendActionButtons(resultPanel);
+      appNode.replaceChildren(resultPanel);
+    } catch (error) {
+      status.textContent = `${t("view.error")}: ${error.message}`;
+    }
+  });
+
+  panel.append(form);
+  appNode.replaceChildren(panel);
+  pathInput.focus();
+}
+
+async function buildCurrentProject() {
+  const appNode = appContainer();
+  if (!appNode) return;
+  setActiveView("");
+  const projectId = requireProject();
+  if (!projectId) {
+    appNode.replaceChildren(renderNoProjectAction());
+    return;
+  }
+
+  appNode.textContent = t("build.loading");
+  try {
+    const result = await api(`/api/projects/${projectId}/build`, { method: "POST" });
+    const panel = createPanel(t("build.ready"));
+    appendField(panel, t("field.projectId"), result.project_id);
+    appendField(panel, t("build.factsCreated"), result.facts_created);
+    appendField(panel, t("build.conflictsCreated"), result.conflicts_created);
+    appendField(panel, t("build.pagesCreated"), result.wiki_pages.length);
+    appendActionButtons(panel);
+    appNode.replaceChildren(panel);
+  } catch (error) {
+    appNode.textContent = `${t("view.error")}: ${error.message}`;
+  }
 }
 
 async function useDemoProject() {
@@ -394,11 +588,7 @@ async function loadView(view) {
 
     const projectId = requireProject();
     if (!projectId) {
-      const panel = createPanel(t("dashboard.title"));
-      const message = document.createElement("p");
-      message.textContent = t("view.noProject");
-      panel.append(message);
-      appNode.replaceChildren(panel);
+      appNode.replaceChildren(renderNoProjectAction());
       return;
     }
 
@@ -422,10 +612,19 @@ document.querySelectorAll("[data-lang]").forEach((button) => {
   button.addEventListener("click", () => translate(button.dataset.lang));
 });
 
-const demoButton = document.querySelector('[data-i18n="action.useDemo"]');
-if (demoButton) {
-  demoButton.addEventListener("click", useDemoProject);
-}
+const actionHandlers = {
+  useDemo: useDemoProject,
+  createProject: showCreateProjectForm,
+  ingest: showIngestForm,
+  buildWiki: buildCurrentProject,
+};
+
+document.querySelectorAll("[data-action]").forEach((button) => {
+  const handler = actionHandlers[button.dataset.action];
+  if (handler) {
+    button.addEventListener("click", handler);
+  }
+});
 
 document.querySelectorAll("[data-view]").forEach((button) => {
   button.addEventListener("click", () => loadView(button.dataset.view));

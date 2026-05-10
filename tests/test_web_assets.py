@@ -17,6 +17,8 @@ class DashboardParser(HTMLParser):
         self.scripts = []
         self.button_stack = []
         self.i18n_buttons = []
+        self.action_buttons = set()
+        self.language_switches = []
 
     def handle_starttag(self, tag, attrs):
         attr_map = dict(attrs)
@@ -30,11 +32,16 @@ class DashboardParser(HTMLParser):
             self.icons.append(attr_map["href"])
         if tag == "script" and "src" in attr_map:
             self.scripts.append(attr_map["src"])
+        if "data-action" in attr_map:
+            self.action_buttons.add(attr_map["data-action"])
+        if "data-active-lang" in attr_map:
+            self.language_switches.append(attr_map["data-active-lang"])
         if tag == "button":
             self.button_stack.append(
                 {
                     "data_i18n": attr_map.get("data-i18n"),
                     "data_view": attr_map.get("data-view"),
+                    "data_action": attr_map.get("data-action"),
                     "text": "",
                 }
             )
@@ -111,6 +118,12 @@ def test_sidebar_buttons_expose_view_hooks():
     assert {"projects", "sources", "facts", "wiki", "conflicts", "handover", "ask"} <= views
 
 
+def test_top_action_buttons_expose_action_hooks():
+    parser = parse_dashboard()
+
+    assert {"useDemo", "createProject", "ingest", "buildWiki"} <= parser.action_buttons
+
+
 def test_i18n_contains_chinese_and_english_dictionaries():
     content = (STATIC / "i18n.js").read_text(encoding="utf-8")
 
@@ -146,7 +159,11 @@ def test_app_js_persists_demo_project_and_wires_dashboard_endpoints():
     assert 'storageSet("projectwiki.currentProjectId"' in content
     assert 'storageGet("projectwiki.currentProjectId")' in content
     assert 'document.querySelectorAll("[data-view]")' in content
+    assert 'document.querySelectorAll("[data-action]")' in content
     for endpoint in (
+        "/api/projects",
+        "/api/projects/${projectId}/ingest",
+        "/api/projects/${projectId}/build",
         "/api/projects/${projectId}/conflicts",
         "/api/projects/${projectId}/wiki",
         "/api/projects/${projectId}/wiki/${slug}",
@@ -162,6 +179,21 @@ def test_i18n_contains_dynamic_dashboard_keys_for_each_language():
     languages = parse_i18n_keys()
     dynamic_keys = {
         "demo.nextActions",
+        "project.create.title",
+        "project.create.name",
+        "project.create.description",
+        "project.create.submit",
+        "project.create.ready",
+        "ingest.title",
+        "ingest.path",
+        "ingest.sourceType",
+        "ingest.submit",
+        "ingest.ready",
+        "build.loading",
+        "build.ready",
+        "build.factsCreated",
+        "build.conflictsCreated",
+        "build.pagesCreated",
         "view.noProject",
         "view.loading",
         "view.error",
@@ -182,6 +214,10 @@ def test_i18n_contains_dynamic_dashboard_keys_for_each_language():
         "field.status",
         "field.severity",
         "field.evidence",
+        "field.projectId",
+        "field.sourcesCreated",
+        "field.filesSeen",
+        "field.skippedFiles",
     }
 
     for language, language_keys in languages.items():
@@ -195,3 +231,17 @@ def test_styles_include_mobile_overflow_guards():
     assert "min-width: 0;" in content
     assert "flex-wrap: wrap;" in content
     assert "display: block;" in content
+
+
+def test_language_switch_has_bouncing_bubble_state():
+    parser = parse_dashboard()
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+    js = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert parser.language_switches == ["en-US"]
+    assert ".language-switch::before" in css
+    assert "language-bubble-hop" in css
+    assert "[data-active-lang=\"en-US\"]" in css
+    assert "function updateLanguageSwitch" in js
+    assert "aria-pressed" in js
+    assert "is-bouncing" in js

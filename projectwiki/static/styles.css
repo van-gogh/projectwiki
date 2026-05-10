@@ -80,16 +80,67 @@ body {
 }
 
 .language-switch {
+  position: relative;
   display: inline-flex;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 999px;
   overflow: hidden;
+  padding: 3px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.04);
+}
+
+.language-switch::before {
+  content: "";
+  position: absolute;
+  inset: 3px auto 3px 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--purple);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.24);
+  transform: translateX(0);
+  transition: transform 220ms cubic-bezier(.2, .85, .25, 1.25);
+}
+
+.language-switch[data-active-lang="en-US"]::before {
+  transform: translateX(100%);
+}
+
+.language-switch.is-bouncing::before {
+  animation: language-bubble-hop 320ms cubic-bezier(.2, .85, .25, 1.2);
 }
 
 .language-switch button {
+  position: relative;
+  z-index: 1;
+  min-width: 42px;
   border: 0;
-  background: var(--panel);
-  padding: 8px 10px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+
+.language-switch button[aria-pressed="true"] {
+  color: #ffffff;
+}
+
+@keyframes language-bubble-hop {
+  0% {
+    scale: 1;
+  }
+  42% {
+    scale: 1.14 .88;
+  }
+  72% {
+    scale: .94 1.08;
+  }
+  100% {
+    scale: 1;
+  }
 }
 
 .dashboard {
@@ -181,6 +232,44 @@ pre {
   font: inherit;
 }
 
+.form-panel {
+  margin-top: 16px;
+}
+
+.inline-form {
+  display: grid;
+  gap: 12px;
+}
+
+.inline-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.inline-form input,
+.inline-form textarea,
+.inline-form select {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font: inherit;
+  background: #ffffff;
+}
+
+.inline-form textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.status-line {
+  margin: 0;
+  color: var(--muted);
+}
+
 .primary {
   background: var(--purple);
   color: white;
@@ -219,6 +308,10 @@ pre {
     flex-shrink: 0;
   }
 
+  .language-switch button {
+    min-width: 40px;
+  }
+
   .dashboard {
     padding: 16px;
   }
@@ -228,7 +321,19 @@ pre {
   }
 
   .ask-form input,
-  .ask-form button {
+  .ask-form button,
+  .inline-form button {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .language-switch::before,
+  .language-switch button {
+    transition: none;
+  }
+
+  .language-switch.is-bouncing::before {
+    animation: none;
   }
 }
