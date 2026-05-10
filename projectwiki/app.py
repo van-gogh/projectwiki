@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from importlib import resources
-from importlib.resources.abc import Traversable
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
@@ -48,7 +48,7 @@ def index() -> str:
     return (static_dir / "index.html").read_text(encoding="utf-8")
 
 
-def demo_project_root() -> Traversable:
+def demo_project_root() -> Any:
     return resources.files("projectwiki").joinpath("demo_project")
 
 

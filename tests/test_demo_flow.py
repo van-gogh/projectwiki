@@ -5,6 +5,24 @@ from projectwiki.app import app
 from projectwiki.services.workspace import list_projects
 
 
+def test_app_does_not_use_python_311_only_resources_import():
+    app_source = app_module.Path(app_module.__file__).read_text(encoding="utf-8")
+
+    assert "importlib.resources.abc" not in app_source
+
+
+def test_pyproject_limits_setuptools_discovery_and_packages_web_assets():
+    pyproject = app_module.Path(app_module.__file__).resolve().parents[1] / "pyproject.toml"
+    content = pyproject.read_text(encoding="utf-8")
+
+    assert "[tool.setuptools.packages.find]" in content
+    assert 'include = ["projectwiki*"]' in content
+    assert '"demo_project/docs/*.md"' in content
+    assert '"static/*.html"' in content
+    assert '"static/*.css"' in content
+    assert '"static/*.js"' in content
+
+
 def test_demo_project_root_uses_packaged_demo_assets():
     root = app_module.demo_project_root()
 
