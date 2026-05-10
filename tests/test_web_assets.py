@@ -99,7 +99,10 @@ def test_i18n_contains_all_dashboard_keys_for_each_language():
     keys = parser.i18n_keys | parser.placeholder_keys
     languages = parse_i18n_keys()
 
-    assert "nav.projects" in keys
+    assert "nav.start" in keys
+    assert "nav.status" in keys
+    assert "nav.review" in keys
+    assert "nav.wikiIndex" in keys
     assert "action.buildWiki" in keys
     assert "search.placeholder" in keys
     assert "dashboard.title" in keys
@@ -115,7 +118,8 @@ def test_sidebar_buttons_expose_view_hooks():
         if button["data_i18n"] and button["data_i18n"].startswith("nav.")
     }
 
-    assert {"projects", "sources", "facts", "wiki", "conflicts", "handover", "ask"} <= views
+    assert {"start", "status", "sources", "review", "ask", "settings", "wiki"} <= views
+    assert "handover" not in views
 
 
 def test_top_action_buttons_expose_action_hooks():
@@ -158,6 +162,8 @@ def test_app_js_persists_demo_project_and_wires_dashboard_endpoints():
     assert "currentProjectId" in content
     assert 'storageSet("projectwiki.currentProjectId"' in content
     assert 'storageGet("projectwiki.currentProjectId")' in content
+    assert "function visibleWikiPages" in content
+    assert 'page.slug !== "handover"' in content
     assert 'document.querySelectorAll("[data-view]")' in content
     assert 'document.querySelectorAll("[data-action]")' in content
     for endpoint in (
@@ -179,6 +185,26 @@ def test_i18n_contains_dynamic_dashboard_keys_for_each_language():
     languages = parse_i18n_keys()
     dynamic_keys = {
         "demo.nextActions",
+        "start.title",
+        "start.subtitle",
+        "workflow.project",
+        "workflow.ingest",
+        "workflow.build",
+        "workflow.review",
+        "workflow.use",
+        "status.title",
+        "status.subtitle",
+        "status.current",
+        "status.recent",
+        "status.review",
+        "status.stable",
+        "status.changed",
+        "status.evidence",
+        "status.needsReview",
+        "review.title",
+        "review.subtitle",
+        "settings.export",
+        "settings.handover",
         "project.create.title",
         "project.create.name",
         "project.create.description",

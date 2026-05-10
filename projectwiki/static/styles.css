@@ -79,6 +79,29 @@ body {
   outline: none;
 }
 
+.topbar-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tool-button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.tool-button:hover,
+.tool-button.active {
+  border-color: #c4b5fd;
+  color: var(--text);
+  background: #f5f3ff;
+}
+
 .language-switch {
   position: relative;
   display: inline-flex;
@@ -158,6 +181,107 @@ body {
   border-radius: 8px;
   background: var(--panel);
   padding: 20px;
+}
+
+.hero-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.hero-panel p,
+.status-intro {
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.workflow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workflow-step,
+.metric-card,
+.state-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfbfc;
+  padding: 12px;
+}
+
+.workflow-step strong,
+.metric-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.workflow-step span,
+.metric-card span,
+.state-card p {
+  color: var(--muted);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.state-section {
+  margin-top: 20px;
+}
+
+.state-section h3 {
+  margin-bottom: 10px;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.state-card {
+  display: grid;
+  gap: 8px;
+}
+
+.state-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-chip.review {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.status-chip.changed {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.status-chip.evidence {
+  background: #f5f3ff;
+  color: var(--purple);
 }
 
 .output-panel {
@@ -304,6 +428,10 @@ pre {
     padding: 12px 16px;
   }
 
+  .topbar-tools {
+    width: 100%;
+  }
+
   .language-switch {
     flex-shrink: 0;
   }
@@ -314,6 +442,12 @@ pre {
 
   .dashboard {
     padding: 16px;
+  }
+
+  .workflow,
+  .metric-grid,
+  .state-grid {
+    grid-template-columns: 1fr;
   }
 
   .record-field {

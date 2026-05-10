@@ -11,12 +11,10 @@
   <aside class="sidebar">
     <div class="brand">ProjectWiki</div>
     <nav>
-      <button data-view="projects" data-i18n="nav.projects">Projects</button>
+      <button data-view="start" data-i18n="nav.start">Start</button>
+      <button data-view="status" data-i18n="nav.status">Project status</button>
       <button data-view="sources" data-i18n="nav.sources">Sources</button>
-      <button data-view="facts" data-i18n="nav.facts">Facts</button>
-      <button data-view="wiki" data-i18n="nav.wiki">Wiki</button>
-      <button data-view="conflicts" data-i18n="nav.conflicts">Conflicts</button>
-      <button data-view="handover" data-i18n="nav.handover">Handover</button>
+      <button data-view="review" data-i18n="nav.review">Review</button>
       <button data-view="ask" data-i18n="nav.ask">Ask</button>
       <button data-view="settings" data-i18n="nav.settings">Settings</button>
     </nav>
@@ -24,9 +22,12 @@
   <main class="workspace">
     <header class="topbar">
       <input id="search" placeholder="Search project memory" data-i18n-placeholder="search.placeholder" />
-      <div class="language-switch" data-active-lang="en-US" aria-label="Language">
-        <button data-lang="zh-CN">中文</button>
-        <button data-lang="en-US">EN</button>
+      <div class="topbar-tools">
+        <button class="tool-button" data-view="wiki" data-i18n="nav.wikiIndex">Wiki index</button>
+        <div class="language-switch" data-active-lang="en-US" aria-label="Language">
+          <button data-lang="zh-CN">中文</button>
+          <button data-lang="en-US">EN</button>
+        </div>
       </div>
     </header>
     <section class="dashboard">
