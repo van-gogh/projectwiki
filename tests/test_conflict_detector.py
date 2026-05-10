@@ -59,6 +59,36 @@ def test_demo_project_conflicts(tmp_path, monkeypatch):
     assert "deployment_model_mismatch" in types
 
 
+def test_conflict_review_status_survives_rebuild(tmp_path, monkeypatch):
+    conn, project = create_ingested_project(
+        tmp_path,
+        monkeypatch,
+        {
+            "deploy.md": "Production deployment uses LSTM model_v1.pkl.",
+            "experiment.md": "Candidate experiment reached better accuracy with Transformer v2.",
+        },
+    )
+
+    detect_conflicts(project["id"], conn=conn)
+    original = conflict_row(conn, project["id"], "deployment_model_mismatch")
+    assert original is not None
+    assert original["conflict_key"]
+
+    conn.execute(
+        "UPDATE conflicts SET status = 'resolved' WHERE id = ?",
+        (original["id"],),
+    )
+    conn.commit()
+
+    detect_conflicts(project["id"], conn=conn)
+
+    rebuilt = conflict_row(conn, project["id"], "deployment_model_mismatch")
+    assert rebuilt is not None
+    assert rebuilt["id"] == original["id"]
+    assert rebuilt["conflict_key"] == original["conflict_key"]
+    assert rebuilt["status"] == "resolved"
+
+
 def test_deployment_model_mismatch_requires_different_identifiers(tmp_path, monkeypatch):
     conn, project = create_ingested_project(
         tmp_path,

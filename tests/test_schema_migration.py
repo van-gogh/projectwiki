@@ -20,6 +20,7 @@ def test_init_db_adds_schema_version_and_review_fields(tmp_path):
     assert {"status"}.issubset(columns(conn, "projects"))
     assert {"version_hint"}.issubset(columns(conn, "sources"))
     assert {"validity_status"}.issubset(columns(conn, "facts"))
+    assert {"conflict_key"}.issubset(columns(conn, "conflicts"))
 
 
 def test_init_db_is_idempotent(tmp_path):
@@ -31,3 +32,4 @@ def test_init_db_is_idempotent(tmp_path):
     init_db(conn)
 
     assert "validity_status" in columns(conn, "facts")
+    assert "conflict_key" in columns(conn, "conflicts")

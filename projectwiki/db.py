@@ -35,8 +35,9 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "projects", "status", "TEXT DEFAULT 'active'")
     ensure_column(conn, "sources", "version_hint", "TEXT DEFAULT ''")
     ensure_column(conn, "facts", "validity_status", "TEXT DEFAULT 'unknown'")
+    ensure_column(conn, "conflicts", "conflict_key", "TEXT DEFAULT ''")
 
-    conn.execute("UPDATE schema_version SET version = 1")
+    conn.execute("UPDATE schema_version SET version = 2")
 
 
 def init_db(conn: sqlite3.Connection | None = None) -> None:
@@ -90,6 +91,7 @@ def init_db(conn: sqlite3.Connection | None = None) -> None:
         CREATE TABLE IF NOT EXISTS conflicts (
             id TEXT PRIMARY KEY,
             project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            conflict_key TEXT DEFAULT '',
             conflict_type TEXT NOT NULL,
             title TEXT NOT NULL,
             description TEXT NOT NULL,
@@ -114,6 +116,7 @@ def init_db(conn: sqlite3.Connection | None = None) -> None:
         CREATE INDEX IF NOT EXISTS idx_blocks_source ON blocks(source_id);
         CREATE INDEX IF NOT EXISTS idx_facts_project ON facts(project_id);
         CREATE INDEX IF NOT EXISTS idx_conflicts_project ON conflicts(project_id);
+        CREATE INDEX IF NOT EXISTS idx_conflicts_project_key ON conflicts(project_id, conflict_key);
         CREATE INDEX IF NOT EXISTS idx_wiki_project ON wiki_pages(project_id);
         """
     )

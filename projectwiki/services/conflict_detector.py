@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import difflib
+import hashlib
 import re
 import sqlite3
 from collections import defaultdict
+from typing import Any
 
 from ..db import connect, init_db
 from ..utils import from_json, new_id, now_iso, to_json
@@ -19,14 +21,23 @@ def detect_conflicts(project_id: str, conn: sqlite3.Connection | None = None) ->
     close = conn is None
     conn = conn or connect()
     init_db(conn)
-    conn.execute("DELETE FROM conflicts WHERE project_id = ?", (project_id,))
 
+    active_keys: set[str] = set()
     inserted = 0
-    inserted += detect_multiple_latest_docs(project_id, conn)
-    inserted += detect_endpoint_conflicts(project_id, conn)
-    inserted += detect_model_term_conflicts(project_id, conn)
-    inserted += detect_missing_file_mentions(project_id, conn)
-    inserted += detect_deployment_model_mismatch(project_id, conn)
+    inserted += detect_multiple_latest_docs(project_id, conn, active_keys)
+    inserted += detect_endpoint_conflicts(project_id, conn, active_keys)
+    inserted += detect_model_term_conflicts(project_id, conn, active_keys)
+    inserted += detect_missing_file_mentions(project_id, conn, active_keys)
+    inserted += detect_deployment_model_mismatch(project_id, conn, active_keys)
+
+    if active_keys:
+        placeholders = ",".join("?" for _ in active_keys)
+        conn.execute(
+            f"DELETE FROM conflicts WHERE project_id = ? AND conflict_key NOT IN ({placeholders})",
+            (project_id, *active_keys),
+        )
+    else:
+        conn.execute("DELETE FROM conflicts WHERE project_id = ?", (project_id,))
 
     conn.commit()
     if close:
@@ -34,17 +45,80 @@ def detect_conflicts(project_id: str, conn: sqlite3.Connection | None = None) ->
     return {"project_id": project_id, "conflicts_created": inserted}
 
 
-def insert_conflict(conn: sqlite3.Connection, project_id: str, conflict_type: str, title: str, description: str, evidence: list, severity: str = "medium") -> None:
+def normalize_conflict_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(k): normalize_conflict_value(value[k]) for k in sorted(value)}
+    if isinstance(value, list):
+        normalized = [normalize_conflict_value(item) for item in value]
+        return sorted(normalized, key=to_json)
+    if isinstance(value, str):
+        return " ".join(value.split())
+    return value
+
+
+def make_conflict_key(conflict_type: str, title: str, evidence: list) -> str:
+    payload = {
+        "conflict_type": normalize_conflict_value(conflict_type),
+        "title": normalize_conflict_value(title),
+        "evidence": normalize_conflict_value(evidence),
+    }
+    digest = hashlib.sha256(to_json(payload).encode("utf-8")).hexdigest()
+    return f"{conflict_type}:{digest[:24]}"
+
+
+def insert_conflict(
+    conn: sqlite3.Connection,
+    project_id: str,
+    conflict_type: str,
+    title: str,
+    description: str,
+    evidence: list,
+    severity: str = "medium",
+    active_keys: set[str] | None = None,
+) -> None:
+    conflict_key = make_conflict_key(conflict_type, title, evidence)
+    if active_keys is not None:
+        active_keys.add(conflict_key)
+    evidence_json = to_json(evidence)
+    existing = conn.execute(
+        """
+        SELECT id FROM conflicts
+        WHERE project_id = ? AND conflict_key = ?
+        ORDER BY created_at ASC
+        LIMIT 1
+        """,
+        (project_id, conflict_key),
+    ).fetchone()
+    if existing is None:
+        existing = conn.execute(
+            """
+            SELECT id FROM conflicts
+            WHERE project_id = ? AND conflict_key = '' AND conflict_type = ? AND title = ?
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            (project_id, conflict_type, title),
+        ).fetchone()
+    if existing is not None:
+        conn.execute(
+            """
+            UPDATE conflicts
+            SET conflict_key = ?, conflict_type = ?, title = ?, description = ?, evidence_json = ?, severity = ?
+            WHERE id = ?
+            """,
+            (conflict_key, conflict_type, title, description, evidence_json, severity, existing["id"]),
+        )
+        return
     conn.execute(
         """
-        INSERT INTO conflicts(id, project_id, conflict_type, title, description, evidence_json, severity, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO conflicts(id, project_id, conflict_key, conflict_type, title, description, evidence_json, severity, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (new_id("conf"), project_id, conflict_type, title, description, to_json(evidence), severity, "open", now_iso()),
+        (new_id("conf"), project_id, conflict_key, conflict_type, title, description, evidence_json, severity, "open", now_iso()),
     )
 
 
-def detect_multiple_latest_docs(project_id: str, conn: sqlite3.Connection) -> int:
+def detect_multiple_latest_docs(project_id: str, conn: sqlite3.Connection, active_keys: set[str]) -> int:
     rows = conn.execute("SELECT id, path, title FROM sources WHERE project_id = ?", (project_id,)).fetchall()
     latest_like = [r for r in rows if any(h.lower() in (r["path"] + r["title"]).lower() for h in LATEST_HINTS)]
     if len(latest_like) <= 1:
@@ -58,11 +132,12 @@ def detect_multiple_latest_docs(project_id: str, conn: sqlite3.Connection) -> in
         "系统发现多个文件名或标题包含 latest/final/最新版/最终版 等线索，需要人工确认当前有效版本。",
         evidence,
         "high",
+        active_keys,
     )
     return 1
 
 
-def detect_endpoint_conflicts(project_id: str, conn: sqlite3.Connection) -> int:
+def detect_endpoint_conflicts(project_id: str, conn: sqlite3.Connection, active_keys: set[str]) -> int:
     rows = conn.execute(
         """
         SELECT b.id AS block_id, b.text, b.location_json, s.id AS source_id, s.path
@@ -106,12 +181,13 @@ def detect_endpoint_conflicts(project_id: str, conn: sqlite3.Connection) -> int:
                         "两个材料中出现了高度相似但不完全一致的接口路径，可能是文档过期或代码变更未同步。",
                         [a, b],
                         "medium",
+                        active_keys,
                     )
                     count += 1
     return count
 
 
-def detect_model_term_conflicts(project_id: str, conn: sqlite3.Connection) -> int:
+def detect_model_term_conflicts(project_id: str, conn: sqlite3.Connection, active_keys: set[str]) -> int:
     rows = conn.execute(
         """
         SELECT b.id AS block_id, b.text, s.id AS source_id, s.path
@@ -142,11 +218,12 @@ def detect_model_term_conflicts(project_id: str, conn: sqlite3.Connection) -> in
         "多个材料在模型/实验语境中提到了不同架构词，需要确认当前有效模型版本。",
         evidence,
         "medium",
+        active_keys,
     )
     return 1
 
 
-def detect_missing_file_mentions(project_id: str, conn: sqlite3.Connection) -> int:
+def detect_missing_file_mentions(project_id: str, conn: sqlite3.Connection, active_keys: set[str]) -> int:
     sources = conn.execute("SELECT path FROM sources WHERE project_id = ?", (project_id,)).fetchall()
     known_paths = {r["path"] for r in sources}
     known_names = {p.split("/")[-1].split("\\")[-1] for p in known_paths}
@@ -177,6 +254,7 @@ def detect_missing_file_mentions(project_id: str, conn: sqlite3.Connection) -> i
         "文档提到了一些脚本或配置文件，但系统未在当前项目来源中找到对应文件。可能是文件缺失、路径变化或未摄入完整材料。",
         missing[:20],
         "low",
+        active_keys,
     )
     return 1
 
@@ -213,7 +291,7 @@ def has_model_identifier_mismatch(deployed_identifiers: set[str], candidate_iden
     return False
 
 
-def detect_deployment_model_mismatch(project_id: str, conn: sqlite3.Connection) -> int:
+def detect_deployment_model_mismatch(project_id: str, conn: sqlite3.Connection, active_keys: set[str]) -> int:
     rows = conn.execute(
         """
         SELECT b.id AS block_id, b.text, s.id AS source_id, s.path
@@ -255,6 +333,7 @@ def detect_deployment_model_mismatch(project_id: str, conn: sqlite3.Connection) 
             ),
             deployment_hits[:3] + experiment_hits[:3],
             "medium",
+            active_keys,
         )
         return 1
     return 0
