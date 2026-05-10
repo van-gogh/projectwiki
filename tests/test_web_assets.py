@@ -13,6 +13,7 @@ class DashboardParser(HTMLParser):
         self.i18n_keys = set()
         self.placeholder_keys = set()
         self.stylesheets = []
+        self.icons = []
         self.scripts = []
         self.button_stack = []
         self.i18n_buttons = []
@@ -25,6 +26,8 @@ class DashboardParser(HTMLParser):
             self.placeholder_keys.add(attr_map["data-i18n-placeholder"])
         if tag == "link" and attr_map.get("rel") == "stylesheet":
             self.stylesheets.append(attr_map["href"])
+        if tag == "link" and attr_map.get("rel") == "icon":
+            self.icons.append(attr_map["href"])
         if tag == "script" and "src" in attr_map:
             self.scripts.append(attr_map["src"])
         if tag == "button":
@@ -75,6 +78,7 @@ def test_dashboard_asset_references_exist():
     assert (STATIC / "styles.css").exists()
     assert (STATIC / "app.js").exists()
     assert (STATIC / "i18n.js").exists()
+    assert parser.icons == ["data:,"]
     assert parser.stylesheets == ["/static/styles.css"]
     assert parser.scripts == ["/static/i18n.js", "/static/app.js"]
     for href in parser.stylesheets:
