@@ -1,0 +1,25 @@
+[project]
+name = "projectwiki"
+version = "0.1.0"
+description = "Starter scaffold for an AI-maintained project wiki."
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.7",
+    "python-multipart>=0.0.9",
+    "openpyxl>=3.1.2",
+    "python-docx>=1.1.0",
+    "pypdf>=4.2.0"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2"]
+
+[project.scripts]
+projectwiki = "projectwiki.cli:main"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"

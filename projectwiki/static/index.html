@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProjectWiki</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 40px; line-height: 1.6; }
+    input, textarea, button { font: inherit; padding: 8px; margin: 4px 0; width: 100%; max-width: 760px; }
+    button { width: auto; cursor: pointer; }
+    pre { background: #f6f8fa; padding: 16px; overflow: auto; max-width: 960px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 18px; margin: 18px 0; max-width: 960px; }
+  </style>
+</head>
+<body>
+  <h1>ProjectWiki</h1>
+  <p>把本地项目文档和代码整理成 source-backed blocks、project facts、Wiki、冲突报告和交接包。</p>
+
+  <div class="card">
+    <h2>1. 创建项目</h2>
+    <input id="projectName" placeholder="项目名称" />
+    <textarea id="projectDesc" placeholder="项目描述"></textarea>
+    <button onclick="createProject()">创建</button>
+  </div>
+
+  <div class="card">
+    <h2>2. 项目列表</h2>
+    <button onclick="loadProjects()">刷新</button>
+    <pre id="projects"></pre>
+  </div>
+
+  <div class="card">
+    <h2>3. 摄入与构建</h2>
+    <input id="projectId" placeholder="project_id" />
+    <input id="sourcePath" placeholder="本地路径，例如 /workspace/examples/demo-project" />
+    <button onclick="ingest()">Ingest</button>
+    <button onclick="build()">Build Wiki</button>
+    <pre id="buildResult"></pre>
+  </div>
+
+  <div class="card">
+    <h2>4. 提问</h2>
+    <input id="question" placeholder="例如：这个项目当前有哪些冲突？" />
+    <button onclick="ask()">Ask</button>
+    <pre id="answer"></pre>
+  </div>
+
+  <script>
+    async function api(path, options = {}) {
+      const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return text; }
+    }
+    async function createProject() {
+      const data = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name: projectName.value, description: projectDesc.value }) });
+      buildResult.textContent = JSON.stringify(data, null, 2);
+      projectId.value = data.id || '';
+      await loadProjects();
+    }
+    async function loadProjects() {
+      const data = await api('/api/projects');
+      projects.textContent = JSON.stringify(data, null, 2);
+    }
+    async function ingest() {
+      const data = await api(`/api/projects/${projectId.value}/ingest`, { method: 'POST', body: JSON.stringify({ path: sourcePath.value, source_type: 'local' }) });
+      buildResult.textContent = JSON.stringify(data, null, 2);
+    }
+    async function build() {
+      const data = await api(`/api/projects/${projectId.value}/build`, { method: 'POST' });
+      buildResult.textContent = JSON.stringify(data, null, 2);
+    }
+    async function ask() {
+      const data = await api(`/api/projects/${projectId.value}/ask`, { method: 'POST', body: JSON.stringify({ question: question.value }) });
+      answer.textContent = typeof data === 'string' ? data : data.answer;
+    }
+    loadProjects();
+  </script>
+</body>
+</html>

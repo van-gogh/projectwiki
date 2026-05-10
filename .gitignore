@@ -1,0 +1,23 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and local env
+.venv/
+venv/
+.env
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# ProjectWiki local data
+.projectwiki/

@@ -1,0 +1,78 @@
+from __future__ import annotations
+
+import sqlite3
+from collections import defaultdict
+
+from ..db import connect, init_db
+from ..utils import from_json
+
+
+def generate_handover(project_id: str, conn: sqlite3.Connection | None = None) -> str:
+    close = conn is None
+    conn = conn or connect()
+    init_db(conn)
+    project = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    facts = conn.execute("SELECT * FROM facts WHERE project_id = ? ORDER BY confidence DESC LIMIT 80", (project_id,)).fetchall()
+    conflicts = conn.execute("SELECT * FROM conflicts WHERE project_id = ? ORDER BY created_at DESC", (project_id,)).fetchall()
+    sources = conn.execute("SELECT * FROM sources WHERE project_id = ? ORDER BY path", (project_id,)).fetchall()
+
+    by_type = defaultdict(list)
+    for fact in facts:
+        by_type[fact["fact_type"]].append(fact)
+
+    lines = [f"# {project['name']} 交接包", ""]
+    if project["description"]:
+        lines += [project["description"], ""]
+
+    lines += ["## 1. 当前材料概览", ""]
+    lines.append(f"- 已摄入来源：{len(sources)} 个")
+    lines.append(f"- 已抽取事实：{len(facts)} 条（显示前 80 条）")
+    lines.append(f"- 待审查冲突：{len(conflicts)} 条")
+    lines.append("")
+
+    lines += ["## 2. 推荐阅读顺序", ""]
+    priority = ["README", "overview", "需求", "requirement", "architecture", "api", "deploy", "实验", "experiment"]
+    ranked = sorted(sources, key=lambda s: min([i for i, k in enumerate(priority) if k.lower() in (s["path"] + s["title"]).lower()] or [99]))
+    for src in ranked[:12]:
+        lines.append(f"- `{src['path']}`")
+    lines.append("")
+
+    sections = [
+        ("requirement", "3. 当前需求 / 业务目标"),
+        ("code", "4. 代码结构 / 核心模块"),
+        ("api", "5. 接口信息"),
+        ("experiment", "6. 实验 / 模型 / 数据"),
+        ("deployment", "7. 运行与部署"),
+        ("decision", "8. 历史决策与变更原因"),
+    ]
+    for fact_type, title in sections:
+        lines += [f"## {title}", ""]
+        items = by_type.get(fact_type, [])[:10]
+        if not items:
+            lines.append("- 暂未从当前材料中抽取到足够信息。")
+        for fact in items:
+            evidence = from_json(fact["evidence_json"], [])
+            pointer = evidence[0]["path"] if evidence else "unknown"
+            lines.append(f"- {fact['statement']}  ")
+            lines.append(f"  - 证据：`{pointer}`")
+        lines.append("")
+
+    lines += ["## 9. 待审查冲突", ""]
+    if not conflicts:
+        lines.append("- 暂未发现冲突。")
+    for conf in conflicts:
+        lines.append(f"- **{conf['title']}**（{conf['severity']}）")
+        lines.append(f"  - {conf['description']}")
+    lines.append("")
+
+    lines += ["## 10. 新人接手建议", ""]
+    lines += [
+        "1. 先读本交接包和 `overview.md`。",
+        "2. 再读推荐阅读顺序中的前 3-5 个材料。",
+        "3. 优先处理 `conflicts.md` 中的 high/medium 冲突。",
+        "4. 对低置信度或缺少证据的事实进行人工确认。",
+    ]
+
+    if close:
+        conn.close()
+    return "\n".join(lines).strip() + "\n"
