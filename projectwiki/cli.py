@@ -5,6 +5,7 @@ import json
 import sys
 
 from .db import init_db
+from .runtime import default_runtime_paths, read_log_tail, read_runtime_state
 from .services.ask import ask_project
 from .services.ingest import ingest_path
 from .services.wiki_engine import build_project
@@ -39,6 +40,15 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8080)
 
+    sub.add_parser("open")
+    sub.add_parser("status")
+
+    p_log = sub.add_parser("log")
+    p_log.add_argument("--lines", type=int, default=80)
+
+    sub.add_parser("doctor")
+    sub.add_parser("stop")
+
     args = parser.parse_args(argv)
 
     if args.command == "init-db":
@@ -70,6 +80,34 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "serve":
         import uvicorn
         uvicorn.run("projectwiki.app:app", host=args.host, port=args.port, reload=False)
+        return 0
+
+    if args.command == "status":
+        state = read_runtime_state(default_runtime_paths())
+        print(json.dumps(state or {"running": False}, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "log":
+        print(read_log_tail(default_runtime_paths(), args.lines), end="")
+        return 0
+
+    if args.command == "doctor":
+        paths = default_runtime_paths()
+        print(json.dumps({
+            "data_dir": str(paths.data_dir),
+            "state_file_exists": paths.state_path.exists(),
+            "log_file_exists": paths.log_path.exists(),
+        }, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "open":
+        state = read_runtime_state(default_runtime_paths()) or {}
+        url = f"http://{state.get('host', '127.0.0.1')}:{state.get('port', 8765)}"
+        print(url)
+        return 0
+
+    if args.command == "stop":
+        print("Stop is not active yet. Use Ctrl+C for foreground serve sessions.")
         return 0
 
     return 1
