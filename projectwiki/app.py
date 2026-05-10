@@ -52,8 +52,11 @@ def demo_project_root() -> Path:
 
 @app.post("/api/demo")
 def api_demo() -> dict:
+    root = demo_project_root()
+    if not root.exists() or not root.is_dir():
+        raise HTTPException(status_code=500, detail=f"Demo project assets not found: {root}")
     project = create_project("Demo Project", "Messy sample project for ProjectWiki")
-    ingest = ingest_path(project["id"], demo_project_root())
+    ingest = ingest_path(project["id"], root)
     build = build_project(project["id"])
     return {"project": project, "ingest": ingest, "build": build}
 
