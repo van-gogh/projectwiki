@@ -55,6 +55,12 @@ body {
   color: var(--text);
 }
 
+.sidebar button.active {
+  background: #ede9fe;
+  color: var(--text);
+  font-weight: 600;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -103,6 +109,78 @@ body {
   padding: 20px;
 }
 
+.output-panel {
+  margin-top: 16px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.next-actions {
+  margin-top: 8px;
+}
+
+.record-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.record-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfbfc;
+}
+
+.record-field {
+  display: grid;
+  grid-template-columns: minmax(96px, 160px) minmax(0, 1fr);
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.record-field span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.record-field.stacked {
+  display: block;
+}
+
+pre {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f7f7f8;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wiki-page {
+  margin-top: 16px;
+}
+
+.ask-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ask-form input {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
 .primary {
   background: var(--purple);
   color: white;
@@ -143,5 +221,14 @@ body {
 
   .dashboard {
     padding: 16px;
+  }
+
+  .record-field {
+    display: block;
+  }
+
+  .ask-form input,
+  .ask-form button {
+    width: 100%;
   }
 }

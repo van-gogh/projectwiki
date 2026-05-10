@@ -31,6 +31,7 @@ class DashboardParser(HTMLParser):
             self.button_stack.append(
                 {
                     "data_i18n": attr_map.get("data-i18n"),
+                    "data_view": attr_map.get("data-view"),
                     "text": "",
                 }
             )
@@ -95,6 +96,17 @@ def test_i18n_contains_all_dashboard_keys_for_each_language():
         assert not keys - language_keys, f"{language} missing keys: {sorted(keys - language_keys)}"
 
 
+def test_sidebar_buttons_expose_view_hooks():
+    parser = parse_dashboard()
+    views = {
+        button["data_view"]
+        for button in parser.i18n_buttons
+        if button["data_i18n"] and button["data_i18n"].startswith("nav.")
+    }
+
+    assert {"projects", "sources", "facts", "wiki", "conflicts", "handover", "ask"} <= views
+
+
 def test_i18n_contains_chinese_and_english_dictionaries():
     content = (STATIC / "i18n.js").read_text(encoding="utf-8")
 
@@ -121,6 +133,55 @@ def test_app_js_handles_unavailable_storage_and_bad_language_data():
     assert "function normalizeLanguage" in content
     assert 'dictionaries["en-US"] || {}' in content
     assert "data-i18n-placeholder" in content
+
+
+def test_app_js_persists_demo_project_and_wires_dashboard_endpoints():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "currentProjectId" in content
+    assert 'storageSet("projectwiki.currentProjectId"' in content
+    assert 'storageGet("projectwiki.currentProjectId")' in content
+    assert 'document.querySelectorAll("[data-view]")' in content
+    for endpoint in (
+        "/api/projects/${projectId}/conflicts",
+        "/api/projects/${projectId}/wiki",
+        "/api/projects/${projectId}/wiki/${slug}",
+        "/api/projects/${projectId}/handover",
+        "/api/projects/${projectId}/ask",
+        "/api/projects/${projectId}/sources",
+        "/api/projects/${projectId}/facts",
+    ):
+        assert endpoint in content
+
+
+def test_i18n_contains_dynamic_dashboard_keys_for_each_language():
+    languages = parse_i18n_keys()
+    dynamic_keys = {
+        "demo.nextActions",
+        "view.noProject",
+        "view.loading",
+        "view.error",
+        "view.sources.title",
+        "view.facts.title",
+        "view.wiki.title",
+        "view.conflicts.title",
+        "view.handover.title",
+        "view.ask.title",
+        "view.empty",
+        "ask.defaultQuestion",
+        "ask.submit",
+        "field.path",
+        "field.title",
+        "field.type",
+        "field.statement",
+        "field.confidence",
+        "field.status",
+        "field.severity",
+        "field.evidence",
+    }
+
+    for language, language_keys in languages.items():
+        assert not dynamic_keys - language_keys, f"{language} missing keys: {sorted(dynamic_keys - language_keys)}"
 
 
 def test_styles_include_mobile_overflow_guards():
