@@ -46,6 +46,18 @@ def index() -> str:
     return (static_dir / "index.html").read_text(encoding="utf-8")
 
 
+def demo_project_root() -> Path:
+    return Path(__file__).resolve().parents[1] / "examples" / "demo-project"
+
+
+@app.post("/api/demo")
+def api_demo() -> dict:
+    project = create_project("Demo Project", "Messy sample project for ProjectWiki")
+    ingest = ingest_path(project["id"], demo_project_root())
+    build = build_project(project["id"])
+    return {"project": project, "ingest": ingest, "build": build}
+
+
 @app.post("/api/projects")
 def api_create_project(req: CreateProjectRequest) -> dict:
     return create_project(req.name, req.description)

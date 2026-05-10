@@ -15,7 +15,14 @@ window.ProjectWikiI18n = {
     "dashboard.title": "Project Memory",
     "search.placeholder": "Search project memory",
     "empty.noProjects": "No projects yet",
-    "error.readLogs": "Run projectwiki log to inspect startup logs."
+    "error.readLogs": "Run projectwiki log to inspect startup logs.",
+    "demo.loading": "Building the demo project...",
+    "demo.ready": "Demo project is ready",
+    "demo.projectId": "Project ID",
+    "demo.blocksCreated": "Blocks created",
+    "demo.factsCreated": "Facts created",
+    "demo.nextSteps": "Open Conflicts, Wiki, Handover, and Ask to inspect evidence-backed project memory.",
+    "demo.error": "Demo project failed"
   },
   "zh-CN": {
     "nav.projects": "项目",
@@ -33,6 +40,13 @@ window.ProjectWikiI18n = {
     "dashboard.title": "项目记忆",
     "search.placeholder": "搜索项目记忆",
     "empty.noProjects": "还没有项目",
-    "error.readLogs": "运行 projectwiki log 查看启动日志。"
+    "error.readLogs": "运行 projectwiki log 查看启动日志。",
+    "demo.loading": "正在生成示例项目...",
+    "demo.ready": "示例项目已就绪",
+    "demo.projectId": "项目 ID",
+    "demo.blocksCreated": "已创建块",
+    "demo.factsCreated": "已创建事实",
+    "demo.nextSteps": "打开冲突、Wiki、交接包和提问，检查带证据的项目记忆。",
+    "demo.error": "示例项目生成失败"
   }
 };

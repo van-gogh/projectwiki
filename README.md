@@ -45,7 +45,7 @@ Not yet implemented deeply:
 
 ## Product startup target
 
-The intended first-board product flow is:
+First run:
 
 ```bash
 npm install -g projectwiki
@@ -65,6 +65,8 @@ projectwiki log
 ```
 
 All normal work should happen in the Web dashboard after startup. `projectwiki log` should show the current or most recent startup logs.
+
+Open the printed local URL, click `Use demo project`, then inspect Conflicts, Wiki, Handover, and Ask with evidence.
 
 ## Current developer setup
 
