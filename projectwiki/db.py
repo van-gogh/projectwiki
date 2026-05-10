@@ -16,6 +16,29 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     return conn
 
 
+def table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return {row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in rows}
+
+
+def ensure_column(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
+    if column not in table_columns(conn, table):
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def apply_migrations(conn: sqlite3.Connection) -> None:
+    conn.execute("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)")
+    row = conn.execute("SELECT version FROM schema_version").fetchone()
+    if row is None:
+        conn.execute("INSERT INTO schema_version(version) VALUES (0)")
+
+    ensure_column(conn, "projects", "status", "TEXT DEFAULT 'active'")
+    ensure_column(conn, "sources", "version_hint", "TEXT DEFAULT ''")
+    ensure_column(conn, "facts", "validity_status", "TEXT DEFAULT 'unknown'")
+
+    conn.execute("UPDATE schema_version SET version = 1")
+
+
 def init_db(conn: sqlite3.Connection | None = None) -> None:
     close = conn is None
     conn = conn or connect()
@@ -94,6 +117,7 @@ def init_db(conn: sqlite3.Connection | None = None) -> None:
         CREATE INDEX IF NOT EXISTS idx_wiki_project ON wiki_pages(project_id);
         """
     )
+    apply_migrations(conn)
     conn.commit()
     if close:
         conn.close()
