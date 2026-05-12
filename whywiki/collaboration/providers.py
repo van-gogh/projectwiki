@@ -46,10 +46,12 @@ class GitHubProviderClient:
 
     def check_repo(self, repo: RepoRef) -> RepoPermission:
         from urllib.error import HTTPError
+        from urllib.parse import quote
         from urllib.request import Request, urlopen
 
+        owner, name = repo.repo.split("/", maxsplit=1)
         request = Request(
-            f"https://api.github.com/repos/{repo.repo}",
+            f"https://api.github.com/repos/{quote(owner, safe='')}/{quote(name, safe='')}",
             headers={
                 "Accept": "application/vnd.github+json",
                 "Authorization": f"Bearer {self._token}",
