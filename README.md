@@ -59,7 +59,7 @@ Logs:
 whywiki log
 ```
 
-Open the URL, click `Use demo project`, then inspect project status, conflicts, wiki pages, handover, sources, and Ask with evidence.
+Open the URL, create a project, ingest a local folder, then inspect project status, conflicts, wiki pages, handover, sources, and Ask with evidence.
 
 For local repository development, use the restart script:
 
@@ -106,8 +106,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 whywiki init-db
-whywiki create "Demo Project"
-whywiki ingest <PROJECT_ID> ./examples/demo-project
+whywiki create "My Project"
+whywiki ingest <PROJECT_ID> /path/to/your/project
 whywiki build <PROJECT_ID>
 whywiki ask <PROJECT_ID> "这个项目当前有哪些冲突？"
 whywiki serve
@@ -125,8 +125,9 @@ docker compose up --build
 
 1. Read `AGENTS.md`.
 2. Read `docs/CODEX_TASKS.md`.
-3. Start with one task at a time.
-4. After each meaningful change, run:
+3. Update `docs/FEATURE_STATUS.md` when feature behavior changes.
+4. Start with one task at a time.
+5. After each meaningful change, run:
 
 ```bash
 python -m compileall whywiki

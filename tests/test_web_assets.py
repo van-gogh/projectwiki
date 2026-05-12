@@ -19,6 +19,7 @@ class DashboardParser(HTMLParser):
         self.i18n_buttons = []
         self.action_buttons = set()
         self.language_switches = []
+        self.workspace_navs = 0
 
     def handle_starttag(self, tag, attrs):
         attr_map = dict(attrs)
@@ -36,6 +37,8 @@ class DashboardParser(HTMLParser):
             self.action_buttons.add(attr_map["data-action"])
         if "data-active-lang" in attr_map:
             self.language_switches.append(attr_map["data-active-lang"])
+        if "data-workspace-nav" in attr_map:
+            self.workspace_navs += 1
         if tag == "button":
             self.button_stack.append(
                 {
@@ -99,13 +102,10 @@ def test_i18n_contains_all_dashboard_keys_for_each_language():
     keys = parser.i18n_keys | parser.placeholder_keys
     languages = parse_i18n_keys()
 
-    assert "nav.start" in keys
     assert "nav.status" in keys
     assert "nav.review" in keys
     assert "nav.wikiIndex" in keys
-    assert "action.buildWiki" in keys
     assert "search.placeholder" in keys
-    assert "dashboard.title" in keys
     for language, language_keys in languages.items():
         assert not keys - language_keys, f"{language} missing keys: {sorted(keys - language_keys)}"
 
@@ -118,14 +118,17 @@ def test_sidebar_buttons_expose_view_hooks():
         if button["data_i18n"] and button["data_i18n"].startswith("nav.")
     }
 
-    assert {"start", "status", "sources", "review", "ask", "settings", "wiki"} <= views
+    assert parser.workspace_navs == 1
+    assert {"status", "sources", "review", "ask", "settings", "wiki"} <= views
+    assert "start" not in views
     assert "handover" not in views
 
 
-def test_top_action_buttons_expose_action_hooks():
+def test_static_shell_does_not_expose_home_action_buttons():
     parser = parse_dashboard()
 
-    assert {"useDemo", "createProject", "ingest", "buildWiki"} <= parser.action_buttons
+    assert not parser.action_buttons
+    assert "useDemo" not in parser.action_buttons
 
 
 def test_i18n_contains_chinese_and_english_dictionaries():
@@ -156,20 +159,24 @@ def test_app_js_handles_unavailable_storage_and_bad_language_data():
     assert "data-i18n-placeholder" in content
 
 
-def test_app_js_persists_demo_project_and_wires_dashboard_endpoints():
+def test_app_js_persists_current_project_and_wires_dashboard_endpoints():
     content = (STATIC / "app.js").read_text(encoding="utf-8")
 
     assert "currentProjectId" in content
     assert 'storageSet("whywiki.currentProjectId"' in content
     assert 'storageGet("whywiki.currentProjectId")' in content
+    assert "function renderProjectsHome" in content
+    assert "function selectProject" in content
+    assert "function updateWorkspaceChrome" in content
+    assert "useDemoProject" not in content
+    assert "/api/demo" not in content
     assert "function visibleWikiPages" in content
     assert 'page.slug !== "handover"' in content
     assert 'document.querySelectorAll("[data-view]")' in content
     assert 'document.querySelectorAll("[data-action]")' in content
     for endpoint in (
         "/api/projects",
-        "/api/projects/${projectId}/ingest",
-        "/api/projects/${projectId}/build",
+        "/api/projects/${projectId}",
         "/api/projects/${projectId}/conflicts",
         "/api/projects/${projectId}/wiki",
         "/api/projects/${projectId}/wiki/${slug}",
@@ -184,14 +191,11 @@ def test_app_js_persists_demo_project_and_wires_dashboard_endpoints():
 def test_i18n_contains_dynamic_dashboard_keys_for_each_language():
     languages = parse_i18n_keys()
     dynamic_keys = {
-        "demo.nextActions",
-        "start.title",
-        "start.subtitle",
-        "workflow.project",
-        "workflow.ingest",
-        "workflow.build",
-        "workflow.review",
-        "workflow.use",
+        "projects.title",
+        "projects.subtitle",
+        "projects.empty",
+        "projects.open",
+        "projects.noDescription",
         "status.title",
         "status.subtitle",
         "status.current",
@@ -209,7 +213,6 @@ def test_i18n_contains_dynamic_dashboard_keys_for_each_language():
         "project.create.name",
         "project.create.description",
         "project.create.submit",
-        "project.create.ready",
         "ingest.title",
         "ingest.path",
         "ingest.sourceType",
@@ -240,14 +243,35 @@ def test_i18n_contains_dynamic_dashboard_keys_for_each_language():
         "field.status",
         "field.severity",
         "field.evidence",
-        "field.projectId",
         "field.sourcesCreated",
+        "field.blocksCreated",
         "field.filesSeen",
         "field.skippedFiles",
     }
 
     for language, language_keys in languages.items():
         assert not dynamic_keys - language_keys, f"{language} missing keys: {sorted(dynamic_keys - language_keys)}"
+
+
+def test_chinese_navigation_uses_demand_workspace_terms():
+    content = (STATIC / "i18n.js").read_text(encoding="utf-8")
+
+    assert '"nav.status": "需求现状"' in content
+    assert '"nav.sources": "原始文件"' in content
+    assert '"nav.review": "需求冲突点"' in content
+    assert '"nav.ask": "需求问答"' in content
+
+
+def test_i18n_does_not_expose_demo_product_copy():
+    languages = parse_i18n_keys()
+
+    for language, language_keys in languages.items():
+        assert not {key for key in language_keys if key.startswith("demo.")}
+        assert "action.useDemo" not in language_keys
+        assert "start.demo" not in language_keys
+        assert "nav.start" not in language_keys
+        assert "project.create.ready" not in language_keys
+        assert "field.projectId" not in language_keys
 
 
 def test_styles_include_mobile_overflow_guards():
@@ -271,3 +295,157 @@ def test_language_switch_has_bouncing_bubble_state():
     assert "function updateLanguageSwitch" in js
     assert "aria-pressed" in js
     assert "is-bouncing" in js
+
+
+def test_app_js_exposes_project_guidance_and_evidence_components():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    for symbol in (
+        "function deriveProjectState",
+        "function renderProjectStatusHero",
+        "function renderOnboardingSteps",
+        "function renderNextActionPanel",
+        "function renderEmptyState",
+        "function renderOperationFeedback",
+        "function renderStatusBadge",
+        "function renderSourceBadge",
+        "function renderEvidenceBadge",
+        "function renderEvidenceDrawer",
+        "function loadEvidenceDetails",
+        "function renderFactCard",
+        "function renderConflictCard",
+        "function renderWikiReader",
+        "function updateConflictStatus",
+        "function updateFactStatus",
+        "function startProjectJob",
+        "function pollProjectJob",
+        "function renderJobProgress",
+    ):
+        assert symbol in content
+
+    for action in (
+        "connectSource",
+        "scanProject",
+        "generateEvidenceWiki",
+        "reviewConflicts",
+        "askWithEvidence",
+        "generateHandover",
+    ):
+        assert action in content
+
+    for endpoint in (
+        "/api/projects/${projectId}/facts/${factId}",
+        "/api/projects/${projectId}/facts/${factId}/evidence",
+        "/api/projects/${projectId}/conflicts/${conflictId}/evidence",
+        "/api/projects/${projectId}/ingest-jobs",
+        "/api/projects/${projectId}/build-jobs",
+        "/api/jobs/${jobId}",
+    ):
+        assert endpoint in content
+
+
+def test_styles_define_whywiki_visual_language_and_states():
+    content = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+    for token in (
+        "--source-git",
+        "--source-doc",
+        "--source-code",
+        "--ai",
+        "--confirmed",
+        "--conflict",
+        "--stale",
+        "--needs-review",
+    ):
+        assert token in content
+
+    for selector in (
+        ".project-status-hero",
+        ".next-action-panel",
+        ".onboarding-steps",
+        ".empty-state",
+        ".operation-feedback",
+        ".job-progress",
+        ".progress-track",
+        ".status-badge",
+        ".source-badge",
+        ".evidence-badge",
+        ".evidence-drawer",
+        ".fact-card",
+        ".conflict-card",
+        ".wiki-reader",
+        ".action-secondary",
+        ".action-tertiary",
+        ".action-destructive",
+        ".action-ai",
+        "button:disabled",
+        "button:focus-visible",
+    ):
+        assert selector in content
+
+
+def test_i18n_contains_p0_p1_ux_copy_for_each_language():
+    languages = parse_i18n_keys()
+    required_keys = {
+        "dashboard.statusHero.title",
+        "dashboard.statusHero.subtitle",
+        "dashboard.nextAction.title",
+        "dashboard.onboarding.title",
+        "workflow.createProject",
+        "workflow.connectSource",
+        "workflow.scanProject",
+        "workflow.generateWiki",
+        "workflow.reviewEvidence",
+        "workflow.askHandover",
+        "empty.sources.title",
+        "empty.sources.body",
+        "empty.facts.title",
+        "empty.facts.body",
+        "empty.wiki.title",
+        "empty.wiki.body",
+        "empty.conflicts.title",
+        "empty.conflicts.body",
+        "empty.evidence.title",
+        "empty.evidence.body",
+        "operation.ingest.loading",
+        "operation.ingest.success",
+        "operation.build.loading",
+        "operation.build.success",
+        "operation.ask.loading",
+        "operation.job.running",
+        "operation.job.succeeded",
+        "operation.job.failed",
+        "operation.error.recovery",
+        "badge.git",
+        "badge.document",
+        "badge.code",
+        "badge.aiInference",
+        "badge.evidenceBacked",
+        "badge.needsReview",
+        "badge.confirmed",
+        "badge.conflict",
+        "badge.lowConfidence",
+        "action.connectSource",
+        "action.scanProject",
+        "action.generateEvidenceWiki",
+        "action.reviewConflicts",
+        "action.askWithEvidence",
+        "action.generateHandover",
+        "action.viewEvidence",
+        "action.confirmFact",
+        "action.resolveConflict",
+        "action.ignoreConflict",
+        "action.retry",
+        "evidence.drawer.title",
+        "evidence.drawer.loading",
+        "evidence.drawer.openOriginal",
+        "evidence.blockText",
+        "evidence.confidence.multiSource",
+        "evidence.confidence.singleSource",
+        "evidence.confidence.aiInferred",
+        "ask.noEvidence.title",
+        "ask.noEvidence.body",
+    }
+
+    for language, language_keys in languages.items():
+        assert not required_keys - language_keys, f"{language} missing keys: {sorted(required_keys - language_keys)}"

@@ -37,7 +37,7 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "facts", "validity_status", "TEXT DEFAULT 'unknown'")
     ensure_column(conn, "conflicts", "conflict_key", "TEXT DEFAULT ''")
 
-    conn.execute("UPDATE schema_version SET version = 2")
+    conn.execute("UPDATE schema_version SET version = 3")
 
 
 def init_db(conn: sqlite3.Connection | None = None) -> None:
@@ -111,6 +111,19 @@ def init_db(conn: sqlite3.Connection | None = None) -> None:
             UNIQUE(project_id, slug)
         );
 
+        CREATE TABLE IF NOT EXISTS operation_jobs (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            operation_type TEXT NOT NULL,
+            status TEXT NOT NULL,
+            progress INTEGER DEFAULT 0,
+            message TEXT DEFAULT '',
+            result_json TEXT DEFAULT '{}',
+            error TEXT DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_sources_project ON sources(project_id);
         CREATE INDEX IF NOT EXISTS idx_blocks_project ON blocks(project_id);
         CREATE INDEX IF NOT EXISTS idx_blocks_source ON blocks(source_id);
@@ -118,6 +131,7 @@ def init_db(conn: sqlite3.Connection | None = None) -> None:
         CREATE INDEX IF NOT EXISTS idx_conflicts_project ON conflicts(project_id);
         CREATE INDEX IF NOT EXISTS idx_conflicts_project_key ON conflicts(project_id, conflict_key);
         CREATE INDEX IF NOT EXISTS idx_wiki_project ON wiki_pages(project_id);
+        CREATE INDEX IF NOT EXISTS idx_operation_jobs_project ON operation_jobs(project_id);
         """
     )
     apply_migrations(conn)

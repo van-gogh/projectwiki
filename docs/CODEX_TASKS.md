@@ -23,7 +23,7 @@ pip install -e .[dev]
 python -m compileall whywiki
 python -m pytest -q
 whywiki init-db
-whywiki create "Demo Project"
+whywiki create "My Project"
 ```
 
 验收：命令无错误。
@@ -102,7 +102,7 @@ whywiki
 - 实验记录中的模型版本和部署文档不一致。
 - LSTM / Transformer 等模型架构描述不一致。
 
-验收：示例项目能稳定生成 2-4 条冲突。
+验收：测试夹具和真实项目材料都能稳定生成可解释冲突。
 
 ## Task 5：Wiki Generator
 
@@ -136,26 +136,26 @@ whywiki
 
 页面：
 
-- Projects
-- Project Overview
-- Sources
-- Wiki
-- Conflicts
-- Handover
-- Ask
-- Settings
+- 项目首页：展示已有项目和创建项目入口。
+- 项目工作台：进入具体项目后再显示项目内导航。
+- 需求现状。
+- 原始文件。
+- 需求冲突点。
+- 需求问答。
+- 设置。
 
 验收：执行 `whywiki` 后进入 Web UI，不用命令行也能完成首板闭环；启动或摄入失败时，界面应提示用户可运行 `whywiki log` 查看日志。
 
-## Task 7：示例项目和 README 传播
+## Task 7：真实项目入口和 README 传播
 
 目标：让 GitHub 访客 30 秒内理解产品。
 
 要求：
 
-- 构造一个混乱示例项目。
-- 包含 README、旧需求、新需求、API 文档、代码、实验表格、部署文档。
-- Demo 能显示：生成 Wiki、发现冲突、生成交接包、带证据问答。
+- 首页默认展示已有项目；没有项目时引导用户创建项目。
+- 创建项目后引导用户摄入真实本地文件夹。
+- 测试夹具可以保留混乱材料，但不能作为产品内置 Demo 入口。
+- 产品路径能显示：生成 Wiki、发现冲突、生成交接包、带证据问答。
 - README 第一屏突出：不是 RAG，不是文档库，而是 Project Memory。
 
-验收：README 有一条可复制命令跑完整 Demo。
+验收：README 有一条可复制命令启动本地产品，并说明如何用自己的项目完成闭环。

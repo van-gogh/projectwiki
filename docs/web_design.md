@@ -91,18 +91,21 @@ Avoid a marketing hero as the first screen. The first screen should be the actua
 
 Primary layout:
 
-- Sidebar: Projects, Sources, Wiki, Conflicts, Handover, Ask, Settings
-- Top bar: project switcher, search, status, local server indicator
-- Main dashboard: getting-started card, project health, recent sources, conflict summary, wiki pages, handover shortcut
+- Project home: a list of existing projects, a create-project action, and clear empty states.
+- Project workspace: project-scoped navigation appears only after selecting a project.
+- Project navigation: demand status, original files, demand conflict points, demand Q&A, and settings.
+- Top bar: project name, search, status, and local server indicator.
+- Main dashboard: project health, recent files, conflict summary, wiki pages, and handover shortcut.
 - Floating help/log affordance: links to `whywiki log` and diagnostics when startup or ingest fails
 
 First-run dashboard:
 
-- prominent `Use demo project` action
 - `Create project` action
-- `Ingest local folder` action
+- project cards when local projects already exist
+- `Ingest local folder` action after a project is selected
 - visible explanation that all conclusions are evidence-backed
 - no large text-only onboarding page
+- no packaged demo project path in the product UI
 
 ## Product Principle
 

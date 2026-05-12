@@ -29,7 +29,7 @@ def create_ingested_project(tmp_path, monkeypatch, files: dict[str, str]):
     monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     conn = connect()
     init_db(conn)
-    project = create_project("Demo", conn=conn)
+    project = create_project("Fixture Project", conn=conn)
     root = tmp_path / "project"
     root.mkdir()
     for name, content in files.items():
@@ -40,12 +40,12 @@ def create_ingested_project(tmp_path, monkeypatch, files: dict[str, str]):
     return conn, project
 
 
-def test_demo_project_conflicts(tmp_path, monkeypatch):
+def test_messy_project_fixture_conflicts(tmp_path, monkeypatch):
     monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     conn = connect()
     init_db(conn)
-    project = create_project("Demo", conn=conn)
-    root = Path(__file__).resolve().parents[1] / "examples" / "demo-project"
+    project = create_project("Fixture Project", conn=conn)
+    root = Path(__file__).resolve().parent / "fixtures" / "messy-project"
     ingest_path(project["id"], root, conn=conn)
 
     result = detect_conflicts(project["id"], conn=conn)

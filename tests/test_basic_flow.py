@@ -10,8 +10,8 @@ from whywiki.services.ask import ask_project
 def test_basic_flow(tmp_path, monkeypatch):
     monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     init_db()
-    project = create_project("Demo")
-    root = Path(__file__).resolve().parents[1] / "examples" / "demo-project"
+    project = create_project("Fixture Project")
+    root = Path(__file__).resolve().parent / "fixtures" / "messy-project"
     result = ingest_path(project["id"], root)
     assert result["created_blocks"] > 0
     build = build_project(project["id"])

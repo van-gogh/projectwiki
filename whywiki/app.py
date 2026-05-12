@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from importlib import resources
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
@@ -11,7 +9,9 @@ from pydantic import BaseModel
 
 from .db import connect, init_db, rows_to_dicts
 from .services.ask import ask_project
+from .services.evidence import conflict_evidence, fact_evidence
 from .services.ingest import ingest_path
+from .services.jobs import create_job, get_job, start_background_job
 from .services.wiki_engine import build_project
 from .services.workspace import create_project, get_project, list_projects
 
@@ -38,6 +38,10 @@ class ConflictStatusRequest(BaseModel):
     status: str
 
 
+class FactStatusRequest(BaseModel):
+    status: str
+
+
 @app.on_event("startup")
 def startup() -> None:
     init_db()
@@ -46,22 +50,6 @@ def startup() -> None:
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
     return (static_dir / "index.html").read_text(encoding="utf-8")
-
-
-def demo_project_root() -> Any:
-    return resources.files("whywiki").joinpath("demo_project")
-
-
-@app.post("/api/demo")
-def api_demo() -> dict:
-    root = demo_project_root()
-    with resources.as_file(root) as root_path:
-        if not root_path.exists() or not root_path.is_dir():
-            raise HTTPException(status_code=500, detail=f"Demo project assets not found: {root}")
-        project = create_project("Demo Project", "Messy sample project for WhyWiki")
-        ingest = ingest_path(project["id"], root_path)
-    build = build_project(project["id"])
-    return {"project": project, "ingest": ingest, "build": build}
 
 
 @app.post("/api/projects")
@@ -91,6 +79,22 @@ def api_ingest(project_id: str, req: IngestRequest) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@app.post("/api/projects/{project_id}/ingest-jobs")
+def api_start_ingest_job(project_id: str, req: IngestRequest) -> dict:
+    try:
+        get_project(project_id)
+        job = create_job(project_id, "ingest", "Queued project scan.")
+        start_background_job(
+            job["id"],
+            lambda: ingest_path(project_id, req.path, req.source_type),
+            "Scanning project source.",
+            "Project source scanned.",
+        )
+        return get_job(job["id"])
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @app.post("/api/projects/{project_id}/build")
 def api_build(project_id: str) -> dict:
     try:
@@ -98,6 +102,30 @@ def api_build(project_id: str) -> dict:
         return build_project(project_id)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/projects/{project_id}/build-jobs")
+def api_start_build_job(project_id: str) -> dict:
+    try:
+        get_project(project_id)
+        job = create_job(project_id, "build", "Queued Wiki generation.")
+        start_background_job(
+            job["id"],
+            lambda: build_project(project_id),
+            "Generating evidence-backed Wiki.",
+            "Evidence-backed Wiki generated.",
+        )
+        return get_job(job["id"])
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/jobs/{job_id}")
+def api_get_job(job_id: str) -> dict:
+    try:
+        return get_job(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/projects/{project_id}/wiki")
@@ -141,6 +169,38 @@ def api_list_facts(project_id: str) -> list[dict]:
         return rows_to_dicts(rows)
 
 
+@app.patch("/api/projects/{project_id}/facts/{fact_id}")
+def api_update_fact(project_id: str, fact_id: str, req: FactStatusRequest) -> dict:
+    if req.status not in {"candidate", "confirmed", "needs_review"}:
+        raise HTTPException(status_code=400, detail="Invalid fact status")
+    validity_status = "current" if req.status == "confirmed" else "unknown"
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id FROM facts WHERE project_id = ? AND id = ?",
+            (project_id, fact_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Fact not found")
+        conn.execute(
+            "UPDATE facts SET status = ?, validity_status = ? WHERE project_id = ? AND id = ?",
+            (req.status, validity_status, project_id, fact_id),
+        )
+        conn.commit()
+        updated = conn.execute(
+            "SELECT * FROM facts WHERE project_id = ? AND id = ?",
+            (project_id, fact_id),
+        ).fetchone()
+        return dict(updated)
+
+
+@app.get("/api/projects/{project_id}/facts/{fact_id}/evidence")
+def api_fact_evidence(project_id: str, fact_id: str) -> list[dict]:
+    try:
+        return fact_evidence(project_id, fact_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.get("/api/projects/{project_id}/wiki/{slug}", response_class=PlainTextResponse)
 def api_get_wiki_page(project_id: str, slug: str) -> str:
     with connect() as conn:
@@ -155,6 +215,14 @@ def api_conflicts(project_id: str) -> list[dict]:
     with connect() as conn:
         rows = conn.execute("SELECT * FROM conflicts WHERE project_id = ? ORDER BY created_at DESC", (project_id,)).fetchall()
         return rows_to_dicts(rows)
+
+
+@app.get("/api/projects/{project_id}/conflicts/{conflict_id}/evidence")
+def api_conflict_evidence(project_id: str, conflict_id: str) -> list[dict]:
+    try:
+        return conflict_evidence(project_id, conflict_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.patch("/api/projects/{project_id}/conflicts/{conflict_id}")

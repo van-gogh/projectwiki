@@ -32,10 +32,6 @@ include = ["whywiki*"]
 
 [tool.setuptools.package-data]
 whywiki = [
-    "demo_project/README.md",
-    "demo_project/app.py",
-    "demo_project/docs/*.md",
-    "demo_project/experiments/*.csv",
     "static/*.css",
     "static/*.html",
     "static/*.js",

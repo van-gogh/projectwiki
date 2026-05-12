@@ -1,3 +1,0 @@
-version,architecture,dataset,f1,status
-v1,LSTM,test,0.78,production
-v2,Transformer,test,0.83,candidate

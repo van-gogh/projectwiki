@@ -1,6 +1,6 @@
-# Demo Recommendation Service
+# Recommendation Service
 
-这是一个推荐服务 demo 项目。
+这是一个推荐服务项目。
 
 当前服务提供用户创建接口：POST /api/users/create。
 
@@ -9,3 +9,4 @@
 ```bash
 python app.py
 ```
+

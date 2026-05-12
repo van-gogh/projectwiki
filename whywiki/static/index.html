@@ -10,20 +10,22 @@
 <body>
   <aside class="sidebar">
     <div class="brand">WhyWiki</div>
-    <nav>
-      <button data-view="start" data-i18n="nav.start">Start</button>
-      <button data-view="status" data-i18n="nav.status">Project status</button>
-      <button data-view="sources" data-i18n="nav.sources">Sources</button>
-      <button data-view="review" data-i18n="nav.review">Review</button>
-      <button data-view="ask" data-i18n="nav.ask">Ask</button>
+    <nav data-workspace-nav>
+      <button data-view="status" data-i18n="nav.status">Demand status</button>
+      <button data-view="sources" data-i18n="nav.sources">Original files</button>
+      <button data-view="facts" data-i18n="nav.facts">Facts and evidence</button>
+      <button data-view="review" data-i18n="nav.review">Demand conflicts</button>
+      <button data-view="ask" data-i18n="nav.ask">Demand Q&amp;A</button>
       <button data-view="settings" data-i18n="nav.settings">Settings</button>
     </nav>
   </aside>
   <main class="workspace">
     <header class="topbar">
-      <input id="search" placeholder="Search project memory" data-i18n-placeholder="search.placeholder" />
+      <input id="search" placeholder="Search current project" data-i18n-placeholder="search.placeholder" />
       <div class="topbar-tools">
-        <button class="tool-button" data-view="wiki" data-i18n="nav.wikiIndex">Wiki index</button>
+        <span id="current-project-name" class="project-pill"></span>
+        <button class="tool-button" data-view="projects" data-i18n="nav.projects">Projects</button>
+        <button class="tool-button project-tool" data-view="wiki" data-i18n="nav.wikiIndex">Wiki index</button>
         <div class="language-switch" data-active-lang="en-US" aria-label="Language">
           <button data-lang="zh-CN">中文</button>
           <button data-lang="en-US">EN</button>
@@ -31,15 +33,6 @@
       </div>
     </header>
     <section class="dashboard">
-      <div class="panel">
-        <h1 data-i18n="dashboard.title">Project Memory</h1>
-        <div class="actions">
-          <button class="primary" data-action="useDemo" data-i18n="action.useDemo">Use demo project</button>
-          <button data-action="createProject" data-i18n="action.createProject">Create project</button>
-          <button data-action="ingest" data-i18n="action.ingest">Ingest local folder</button>
-          <button data-action="buildWiki" data-i18n="action.buildWiki">Build wiki</button>
-        </div>
-      </div>
       <div id="app"></div>
     </section>
   </main>

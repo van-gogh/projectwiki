@@ -18,6 +18,18 @@ PRICING_INTENT_TERMS = (
     "pricing",
     "price",
 )
+CONFLICT_INTENT_TERMS = (
+    "冲突",
+    "待审查",
+    "review",
+    "conflict",
+    "conflicts",
+)
+SEVERITY_SCORES = {
+    "high": 3.0,
+    "medium": 2.0,
+    "low": 1.0,
+}
 
 
 def tokenize(text: str) -> set[str]:
@@ -31,6 +43,66 @@ def tokenize(text: str) -> set[str]:
 def has_pricing_intent(text: str) -> bool:
     lower = text.lower()
     return any(term in lower for term in PRICING_INTENT_TERMS)
+
+
+def has_conflict_intent(text: str) -> bool:
+    lower = text.lower()
+    return any(term in lower for term in CONFLICT_INTENT_TERMS)
+
+
+def conflict_evidence_paths(evidence_json: str) -> list[str]:
+    paths = []
+    for item in from_json(evidence_json, []):
+        path = item.get("path") if isinstance(item, dict) else None
+        if path and path not in paths:
+            paths.append(path)
+    return paths
+
+
+def answer_conflict_question(project_id: str, question: str, conn: sqlite3.Connection) -> dict | None:
+    if not has_conflict_intent(question):
+        return None
+
+    rows = conn.execute(
+        """
+        SELECT * FROM conflicts
+        WHERE project_id = ? AND status = 'open'
+        ORDER BY
+          CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END,
+          created_at DESC
+        """,
+        (project_id,),
+    ).fetchall()
+
+    if not rows:
+        return {
+            "question": question,
+            "answer": "当前没有检测到 open 的待审查冲突。",
+            "evidence": [],
+        }
+
+    bullets = []
+    evidence = []
+    for row in rows:
+        paths = conflict_evidence_paths(row["evidence_json"])
+        evidence_text = "、".join(f"`{path}`" for path in paths) if paths else "`unknown`"
+        bullets.append(
+            f"- **{row['title']}**（{row['severity']}）\n"
+            f"  - {row['description']}\n"
+            f"  - 证据：{evidence_text}"
+        )
+        evidence.append(
+            {
+                "kind": "conflict",
+                "id": row["id"],
+                "path": paths[0] if paths else "unknown",
+                "paths": paths,
+                "score": SEVERITY_SCORES.get(row["severity"], 0.0),
+            }
+        )
+
+    answer = "我只能基于当前已摄入材料回答。当前检测到以下待审查冲突：\n\n" + "\n".join(bullets)
+    return {"question": question, "answer": answer, "evidence": evidence}
 
 
 def is_api_evidence(row, tokens: set[str]) -> bool:
@@ -56,6 +128,11 @@ def ask_project(project_id: str, question: str, conn: sqlite3.Connection | None 
     init_db(conn)
     q_tokens = tokenize(question)
     requires_pricing_evidence = has_pricing_intent(question)
+    conflict_answer = answer_conflict_question(project_id, question, conn)
+    if conflict_answer is not None:
+        if close:
+            conn.close()
+        return conflict_answer
 
     candidates = []
     for row in conn.execute(
