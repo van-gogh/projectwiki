@@ -55,6 +55,7 @@ class GitHubProviderClient:
             headers={
                 "Accept": "application/vnd.github+json",
                 "Authorization": f"Bearer {self._token}",
+                "User-Agent": "WhyWiki",
             },
             method="GET",
         )
@@ -90,7 +91,11 @@ class GiteaProviderClient:
         owner, name = repo.repo.split("/", maxsplit=1)
         request = Request(
             f"{self._base_url}/api/v1/repos/{quote(owner, safe='')}/{quote(name, safe='')}",
-            headers={"Authorization": f"token {self._token}"},
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"token {self._token}",
+                "User-Agent": "WhyWiki",
+            },
             method="GET",
         )
 

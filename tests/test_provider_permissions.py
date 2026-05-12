@@ -36,6 +36,13 @@ def _http_error(status_code: int) -> HTTPError:
     )
 
 
+def _request_header(request, name: str) -> str | None:
+    for header_name, value in request.header_items():
+        if header_name.lower() == name.lower():
+            return value
+    return None
+
+
 def test_static_provider_returns_configured_permission():
     registry = ProviderRegistry()
     registry.register(
@@ -113,7 +120,9 @@ def test_github_client_success_quotes_repo_and_reads_write_permissions(monkeypat
 
     request = captured_requests[0]
     assert request.get_full_url() == "https://api.github.com/repos/owner%3Ateam/repo%23one%3Fx"
-    assert request.get_header("Authorization") == f"Bearer {token}"
+    assert _request_header(request, "Accept") == "application/vnd.github+json"
+    assert _request_header(request, "Authorization") == f"Bearer {token}"
+    assert _request_header(request, "User-Agent") == "WhyWiki"
     assert token not in request.get_full_url()
     assert permission.can_read is True
     assert permission.can_write is True
@@ -163,7 +172,9 @@ def test_gitea_client_success_quotes_repo_and_reads_write_permissions(monkeypatc
 
     request = captured_requests[0]
     assert request.get_full_url() == "https://git.example.test/api/v1/repos/team%3Aops/backend%23api%3Fx"
-    assert request.get_header("Authorization") == f"token {token}"
+    assert _request_header(request, "Accept") == "application/json"
+    assert _request_header(request, "Authorization") == f"token {token}"
+    assert _request_header(request, "User-Agent") == "WhyWiki"
     assert token not in request.get_full_url()
     assert permission.can_read is True
     assert permission.can_write is True
