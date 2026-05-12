@@ -167,3 +167,32 @@ def test_gitea_client_success_quotes_repo_and_reads_write_permissions(monkeypatc
     assert token not in request.get_full_url()
     assert permission.can_read is True
     assert permission.can_write is True
+
+
+@pytest.mark.parametrize("status_code", [401, 403, 404])
+def test_gitea_client_fail_closed_for_auth_and_missing_errors(monkeypatch, status_code):
+    def fake_urlopen(request, timeout):
+        raise _http_error(status_code)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    permission = GiteaProviderClient(base_url="https://git.example.test", token="gitea-token").check_repo(
+        RepoRef(provider="gitea", repo="team/backend", base_url="https://git.example.test")
+    )
+
+    assert permission.can_read is False
+    assert permission.can_write is False
+
+
+def test_gitea_client_reraises_unexpected_http_errors(monkeypatch):
+    def fake_urlopen(request, timeout):
+        raise _http_error(500)
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    with pytest.raises(HTTPError) as error:
+        GiteaProviderClient(base_url="https://git.example.test", token="gitea-token").check_repo(
+            RepoRef(provider="gitea", repo="team/backend", base_url="https://git.example.test")
+        )
+
+    assert error.value.code == 500
