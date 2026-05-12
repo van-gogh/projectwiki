@@ -1,7 +1,7 @@
 [project]
-name = "projectwiki"
+name = "whywiki"
 version = "0.1.0"
-description = "Starter scaffold for an AI-maintained project wiki."
+description = "Local-first project memory and AI-maintained wiki for messy software projects."
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
@@ -15,20 +15,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.2"]
+dev = [
+    "httpx>=0.28",
+    "pytest>=8.2",
+]
 
 [project.scripts]
-projectwiki = "projectwiki.cli:main"
+whywiki = "whywiki.cli:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["projectwiki*"]
+include = ["whywiki*"]
 
 [tool.setuptools.package-data]
-projectwiki = [
+whywiki = [
     "demo_project/README.md",
     "demo_project/app.py",
     "demo_project/docs/*.md",

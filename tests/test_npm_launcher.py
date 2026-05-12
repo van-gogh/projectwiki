@@ -6,24 +6,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_package_json_exposes_projectwiki_bin():
+def test_package_json_exposes_whywiki_bin():
     package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-    assert package["name"] == "projectwiki"
-    assert package["bin"]["projectwiki"] == "npm/projectwiki.js"
+    assert package["name"] == "whywiki"
+    assert package["bin"]["whywiki"] == "npm/whywiki.js"
 
 
 def test_node_launcher_delegates_to_python_cli():
-    script = (ROOT / "npm" / "projectwiki.js").read_text(encoding="utf-8")
+    script = (ROOT / "npm" / "whywiki.js").read_text(encoding="utf-8")
 
     assert "python" in script
-    assert "projectwiki.cli" in script
+    assert "whywiki.cli" in script
     assert "spawn" in script
 
 
 def test_node_launcher_runs_python_cli_from_outside_repo(tmp_path):
     result = subprocess.run(
-        ["node", str(ROOT / "npm" / "projectwiki.js"), "--help"],
+        ["node", str(ROOT / "npm" / "whywiki.js"), "--help"],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -32,24 +32,24 @@ def test_node_launcher_runs_python_cli_from_outside_repo(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert "usage:" in result.stdout.lower()
-    assert "projectwiki" in result.stdout
+    assert "whywiki" in result.stdout
 
 
 def test_node_launcher_delegates_default_startup_and_sets_data_dir():
-    script = (ROOT / "npm" / "projectwiki.js").read_text(encoding="utf-8")
+    script = (ROOT / "npm" / "whywiki.js").read_text(encoding="utf-8")
 
     assert '["serve", "--host", "127.0.0.1", "--port", "8765"]' in script
-    assert "ProjectWiki is running locally." not in script
+    assert "WhyWiki is running locally." not in script
     assert "Open: http://127.0.0.1:8765" not in script
-    assert "Logs: projectwiki log" not in script
-    assert "PROJECTWIKI_DATA_DIR" in script
-    assert ".projectwiki" in script
+    assert "Logs: whywiki log" not in script
+    assert "WHYWIKI_DATA_DIR" in script
+    assert ".whywiki" in script
     assert "homedir" in script
 
 
 def test_node_launcher_child_exit_helper_preserves_signals():
     node_code = f"""
-const launcher = require({json.dumps(str(ROOT / "npm" / "projectwiki.js"))});
+const launcher = require({json.dumps(str(ROOT / "npm" / "whywiki.js"))});
 let exitCode = null;
 let killed = null;
 launcher.exitFromChild(null, "SIGTERM", {{
@@ -95,14 +95,14 @@ def test_npmignore_excludes_generated_python_artifacts():
     assert "*.pyc" in npmignore
     assert ".pytest_cache/" in npmignore
     assert ".worktrees/" in npmignore
-    assert ".projectwiki/" in npmignore
+    assert ".whywiki/" in npmignore
 
 
 def test_package_files_exclude_python_bytecode_from_allowlist():
     package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-    assert "!projectwiki/**/__pycache__/" in package["files"]
-    assert "!projectwiki/**/*.pyc" in package["files"]
+    assert "!whywiki/**/__pycache__/" in package["files"]
+    assert "!whywiki/**/*.pyc" in package["files"]
 
 
 def test_npm_pack_dry_run_excludes_generated_python_artifacts(tmp_path):
@@ -135,7 +135,7 @@ def test_npm_pack_dry_run_includes_packaged_demo_assets(tmp_path):
     [package] = json.loads(result.stdout)
     paths = {entry["path"] for entry in package["files"]}
 
-    assert "projectwiki/demo_project/README.md" in paths
-    assert "projectwiki/demo_project/docs/需求_latest.md" in paths
-    assert "projectwiki/demo_project/experiments/model_eval.csv" in paths
+    assert "whywiki/demo_project/README.md" in paths
+    assert "whywiki/demo_project/docs/需求_latest.md" in paths
+    assert "whywiki/demo_project/experiments/model_eval.csv" in paths
     assert "examples/demo-project/README.md" not in paths

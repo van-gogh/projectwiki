@@ -4,7 +4,7 @@ This repository is designed to be developed with Codex or similar agentic coding
 
 ## Product direction
 
-Build an open-source ProjectWiki for small teams, labs, open-source projects, and messy software projects.
+Build an open-source WhyWiki for small teams, labs, open-source projects, and messy software projects.
 
 Do not turn it into:
 
@@ -18,7 +18,7 @@ Core principle:
 
 ```text
 Git remembers code changes.
-ProjectWiki remembers project knowledge and why the project changed.
+WhyWiki remembers project knowledge and why the project changed.
 ```
 
 ## Current architecture
@@ -49,14 +49,14 @@ Markdown is a rendered output. Preserve evidence pointers to original files, pag
 Run after each meaningful change:
 
 ```bash
-python -m compileall projectwiki
+python -m compileall whywiki
 python -m pytest -q
 ```
 
 ## First-board priorities
 
 1. Make the local project flow robust.
-2. Support `projectwiki init-db`, `create`, `ingest`, `build`, `ask`, `serve`.
+2. Support `whywiki init-db`, `create`, `ingest`, `build`, `ask`, `serve`.
 3. Improve blocks and facts.
 4. Improve conflict detection.
 5. Improve Web UI.

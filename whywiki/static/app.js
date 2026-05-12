@@ -1,9 +1,9 @@
 const supportedLanguages = ["zh-CN", "en-US"];
-let currentProjectId = storageGet("projectwiki.currentProjectId");
+let currentProjectId = storageGet("whywiki.currentProjectId");
 let languageBounceTimer = null;
 
 function dictionary() {
-  const dictionaries = window.ProjectWikiI18n || {};
+  const dictionaries = window.WhyWikiI18n || {};
   const lang = normalizeLanguage(document.documentElement.lang);
   return dictionaries[lang] || dictionaries["en-US"] || {};
 }
@@ -33,7 +33,7 @@ function normalizeLanguage(lang) {
 }
 
 function initialLanguage() {
-  const saved = storageGet("projectwiki.language");
+  const saved = storageGet("whywiki.language");
   if (supportedLanguages.includes(saved)) return saved;
   return typeof navigator !== "undefined" && navigator.language && navigator.language.startsWith("zh") ? "zh-CN" : "en-US";
 }
@@ -55,7 +55,7 @@ function updateLanguageSwitch(lang) {
 
 function translate(lang) {
   const normalizedLang = normalizeLanguage(lang);
-  const dictionaries = window.ProjectWikiI18n || {};
+  const dictionaries = window.WhyWikiI18n || {};
   const dict = dictionaries[normalizedLang] || dictionaries["en-US"] || {};
   document.documentElement.lang = normalizedLang;
   document.querySelectorAll("[data-i18n]").forEach((node) => {
@@ -65,7 +65,7 @@ function translate(lang) {
     node.placeholder = dict[node.dataset.i18nPlaceholder] || node.dataset.i18nPlaceholder;
   });
   updateLanguageSwitch(normalizedLang);
-  storageSet("projectwiki.language", normalizedLang);
+  storageSet("whywiki.language", normalizedLang);
 }
 
 async function api(path, options = {}) {
@@ -111,7 +111,7 @@ async function apiText(path, options = {}) {
 
 function setCurrentProjectId(projectId) {
   currentProjectId = projectId;
-  storageSet("projectwiki.currentProjectId", projectId);
+  storageSet("whywiki.currentProjectId", projectId);
 }
 
 function appendField(list, label, value) {

@@ -4,7 +4,7 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STATIC = ROOT / "projectwiki" / "static"
+STATIC = ROOT / "whywiki" / "static"
 
 
 class DashboardParser(HTMLParser):
@@ -160,8 +160,8 @@ def test_app_js_persists_demo_project_and_wires_dashboard_endpoints():
     content = (STATIC / "app.js").read_text(encoding="utf-8")
 
     assert "currentProjectId" in content
-    assert 'storageSet("projectwiki.currentProjectId"' in content
-    assert 'storageGet("projectwiki.currentProjectId")' in content
+    assert 'storageSet("whywiki.currentProjectId"' in content
+    assert 'storageGet("whywiki.currentProjectId")' in content
     assert "function visibleWikiPages" in content
     assert 'page.slug !== "handover"' in content
     assert 'document.querySelectorAll("[data-view]")' in content

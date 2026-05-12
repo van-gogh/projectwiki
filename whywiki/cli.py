@@ -14,7 +14,7 @@ from .runtime import (
     clear_runtime_state,
     default_runtime_paths,
     find_listening_process,
-    probe_projectwiki_server,
+    probe_whywiki_server,
     read_active_runtime_state,
     read_log_tail,
     stop_process,
@@ -37,16 +37,16 @@ def prompt_choice(prompt: str, choices: set[str], default: str) -> str:
     return default
 
 
-def print_running_projectwiki_options(state: dict[str, object]) -> str:
+def print_running_whywiki_options(state: dict[str, object]) -> str:
     host = state.get("host", "127.0.0.1")
     port = state.get("port", 8765)
-    print(f"ProjectWiki is already running on {host}:{port}.")
+    print(f"WhyWiki is already running on {host}:{port}.")
     if state.get("pid") is not None:
         print(f"PID: {state['pid']}")
     if state.get("started_at") is not None:
         print(f"Started: {state['started_at']}")
-    print("1. Continue using the existing ProjectWiki service.")
-    print("2. Restart the ProjectWiki service.")
+    print("1. Continue using the existing WhyWiki service.")
+    print("2. Restart the WhyWiki service.")
     return prompt_choice("Choose 1 or 2: ", {"1", "2"}, default="1")
 
 
@@ -58,7 +58,7 @@ def print_foreign_port_options(host: str, port: int, owner: ProcessInfo | None) 
     else:
         print("PID: unknown")
         print("Command: unknown")
-    print("1. Kill the process using this port and start ProjectWiki.")
+    print("1. Kill the process using this port and start WhyWiki.")
     print("2. Cancel startup.")
     return prompt_choice("Choose 1 or 2: ", {"1", "2"}, default="2")
 
@@ -76,23 +76,23 @@ def run_server(host: str, port: int, paths, restart: bool = False) -> int:
 
     url = f"http://{host}:{port}"
     write_runtime_state(paths, host=host, port=port, pid=os.getpid())
-    append_runtime_log(paths, f"Starting ProjectWiki on {url}")
+    append_runtime_log(paths, f"Starting WhyWiki on {url}")
     if restart:
-        print(f"Restarting ProjectWiki service on {url}")
+        print(f"Restarting WhyWiki service on {url}")
     else:
-        print("ProjectWiki is running locally.")
+        print("WhyWiki is running locally.")
     print(f"Open: {url}")
-    print("Logs: projectwiki log")
+    print("Logs: whywiki log")
     try:
-        uvicorn.run("projectwiki.app:app", host=host, port=port, reload=False)
+        uvicorn.run("whywiki.app:app", host=host, port=port, reload=False)
         return 0
     finally:
-        append_runtime_log(paths, "ProjectWiki server stopped.")
+        append_runtime_log(paths, "WhyWiki server stopped.")
         clear_runtime_state(paths)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="projectwiki")
+    parser = argparse.ArgumentParser(prog="whywiki")
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("init-db")
@@ -132,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "init-db":
         init_db()
-        print("ProjectWiki database initialized.")
+        print("WhyWiki database initialized.")
         return 0
 
     if args.command == "create":
@@ -160,16 +160,16 @@ def main(argv: list[str] | None = None) -> int:
         paths = default_runtime_paths()
         active_state = read_active_runtime_state(paths)
         if active_state is not None:
-            choice = print_running_projectwiki_options(active_state)
+            choice = print_running_whywiki_options(active_state)
             url = f"http://{active_state['host']}:{active_state['port']}"
             if choice == "1":
                 print(f"Open: {url}")
-                print("Logs: projectwiki log")
+                print("Logs: whywiki log")
                 return 0
 
             pid = state_pid(active_state, str(active_state["host"]), int(active_state["port"]))
             if pid is None:
-                print("Could not identify the running ProjectWiki process. Canceling restart.", file=sys.stderr)
+                print("Could not identify the running WhyWiki process. Canceling restart.", file=sys.stderr)
                 return 2
             stop_process(pid)
             clear_runtime_state(paths)
@@ -180,18 +180,18 @@ def main(argv: list[str] | None = None) -> int:
             port = choose_port(args.host, preferred=args.port)
         except PortInUseError:
             port_state = {"host": args.host, "port": args.port}
-            if probe_projectwiki_server(port_state):
+            if probe_whywiki_server(port_state):
                 owner = find_listening_process(args.host, args.port)
-                projectwiki_state = dict(port_state)
+                whywiki_state = dict(port_state)
                 if owner is not None:
-                    projectwiki_state["pid"] = owner.pid
-                choice = print_running_projectwiki_options(projectwiki_state)
+                    whywiki_state["pid"] = owner.pid
+                choice = print_running_whywiki_options(whywiki_state)
                 if choice == "1":
                     print(f"Open: http://{args.host}:{args.port}")
-                    print("Logs: projectwiki log")
+                    print("Logs: whywiki log")
                     return 0
                 if owner is None:
-                    print("Could not identify the running ProjectWiki process. Canceling restart.", file=sys.stderr)
+                    print("Could not identify the running WhyWiki process. Canceling restart.", file=sys.stderr)
                     return 2
                 stop_process(owner.pid)
                 clear_runtime_state(paths)
@@ -208,7 +208,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             stop_process(owner.pid)
             clear_runtime_state(paths)
-            print(f"Starting ProjectWiki after freeing {args.host}:{args.port}.")
+            print(f"Starting WhyWiki after freeing {args.host}:{args.port}.")
             port = choose_port(args.host, preferred=args.port)
 
         return run_server(args.host, port, paths)

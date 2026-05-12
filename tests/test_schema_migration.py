@@ -1,6 +1,6 @@
 import sqlite3
 
-from projectwiki.db import init_db
+from whywiki.db import init_db
 
 
 def columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -9,7 +9,7 @@ def columns(conn: sqlite3.Connection, table: str) -> set[str]:
 
 
 def test_init_db_adds_schema_version_and_review_fields(tmp_path):
-    db_path = tmp_path / "projectwiki.db"
+    db_path = tmp_path / "whywiki.db"
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
 
@@ -24,7 +24,7 @@ def test_init_db_adds_schema_version_and_review_fields(tmp_path):
 
 
 def test_init_db_is_idempotent(tmp_path):
-    db_path = tmp_path / "projectwiki.db"
+    db_path = tmp_path / "whywiki.db"
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
 

@@ -1,4 +1,4 @@
-window.ProjectWikiI18n = {
+window.WhyWikiI18n = {
   "en-US": {
     "nav.start": "Start",
     "nav.status": "Project status",
@@ -22,7 +22,7 @@ window.ProjectWikiI18n = {
     "dashboard.subtitle": "Know what the project currently is, what changed, and what still needs review.",
     "search.placeholder": "Search project memory",
     "empty.noProjects": "No projects yet",
-    "error.readLogs": "Run projectwiki log to inspect startup logs.",
+    "error.readLogs": "Run whywiki log to inspect startup logs.",
     "demo.loading": "Building the demo project...",
     "demo.ready": "Demo project is ready",
     "demo.projectId": "Project ID",
@@ -75,7 +75,7 @@ window.ProjectWikiI18n = {
     "review.subtitle": "Conflicts and extracted conclusions that deserve a human look.",
     "settings.export": "Export project summary",
     "settings.handover": "Generated summary",
-    "view.noProject": "Use the demo project first so ProjectWiki has evidence to inspect.",
+    "view.noProject": "Use the demo project first so WhyWiki has evidence to inspect.",
     "view.loading": "Loading view...",
     "view.error": "View failed",
     "view.projects.title": "Projects",
@@ -129,7 +129,7 @@ window.ProjectWikiI18n = {
     "dashboard.subtitle": "快速知道项目现在是什么、最近变了什么、哪里还需要确认。",
     "search.placeholder": "搜索项目记忆",
     "empty.noProjects": "还没有项目",
-    "error.readLogs": "运行 projectwiki log 查看启动日志。",
+    "error.readLogs": "运行 whywiki log 查看启动日志。",
     "demo.loading": "正在生成示例项目...",
     "demo.ready": "示例项目已就绪",
     "demo.projectId": "项目 ID",
@@ -182,7 +182,7 @@ window.ProjectWikiI18n = {
     "review.subtitle": "这里放冲突和需要人确认的系统结论。",
     "settings.export": "导出项目摘要",
     "settings.handover": "生成的摘要",
-    "view.noProject": "请先使用示例项目，让 ProjectWiki 有可检查的证据。",
+    "view.noProject": "请先使用示例项目，让 WhyWiki 有可检查的证据。",
     "view.loading": "正在加载视图...",
     "view.error": "视图加载失败",
     "view.projects.title": "项目",

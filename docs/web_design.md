@@ -1,35 +1,35 @@
-# ProjectWiki Web and Startup Design
+# WhyWiki Web and Startup Design
 
-ProjectWiki should feel like a local product, not a source-code demo. The first-run experience should lead users into the Web dashboard with one command, then keep all normal work inside the browser.
+WhyWiki should feel like a local product, not a source-code demo. The first-run experience should lead users into the Web dashboard with one command, then keep all normal work inside the browser.
 
 ## Startup Experience
 
 Target first-board product flow:
 
 ```bash
-npm install -g projectwiki
-projectwiki
+npm install -g whywiki
+whywiki
 ```
 
-The `projectwiki` command starts the local Web server quietly on the default local URL, initializes the data directory, and prints a clickable link:
+The `whywiki` command starts the local Web server quietly on the default local URL, initializes the data directory, and prints a clickable link:
 
 ```text
-ProjectWiki is running locally.
+WhyWiki is running locally.
 
 Open:
 http://127.0.0.1:8765
 
 Logs:
-projectwiki log
+whywiki log
 
 Data:
-~/.projectwiki
+~/.whywiki
 ```
 
 The command should be idempotent and explicit:
 
-- If ProjectWiki is already running on the port, show the current port, process id, startup metadata, and let the user choose whether to continue using it or restart ProjectWiki.
-- If another process is using the port, show the process information and let the user choose whether to kill that process and start ProjectWiki or cancel startup.
+- If WhyWiki is already running on the port, show the current port, process id, startup metadata, and let the user choose whether to continue using it or restart WhyWiki.
+- If another process is using the port, show the process information and let the user choose whether to kill that process and start WhyWiki or cancel startup.
 - The launcher must not silently choose a random fallback port.
 
 ## Launcher Commands
@@ -37,15 +37,15 @@ The command should be idempotent and explicit:
 The npm package should expose a small local-app launcher:
 
 ```bash
-projectwiki          # start quietly, print the local Web URL
-projectwiki open     # open the current Web UI
-projectwiki status   # show running state, port, version, and data directory
-projectwiki log      # show logs for the current or most recent startup
-projectwiki stop     # stop the local background service
-projectwiki doctor   # diagnose port, runtime, and data directory problems
+whywiki          # start quietly, print the local Web URL
+whywiki open     # open the current Web UI
+whywiki status   # show running state, port, version, and data directory
+whywiki log      # show logs for the current or most recent startup
+whywiki stop     # stop the local background service
+whywiki doctor   # diagnose port, runtime, and data directory problems
 ```
 
-`projectwiki log` is part of the product surface. Users should not need to know process IDs, Docker logs, uvicorn internals, or where stdout was redirected. The first version can read from `~/.projectwiki/logs/projectwiki.log` and support a simple `--tail` option later.
+`whywiki log` is part of the product surface. Users should not need to know process IDs, Docker logs, uvicorn internals, or where stdout was redirected. The first version can read from `~/.whywiki/logs/whywiki.log` and support a simple `--tail` option later.
 
 ## Installation Strategy
 
@@ -94,7 +94,7 @@ Primary layout:
 - Sidebar: Projects, Sources, Wiki, Conflicts, Handover, Ask, Settings
 - Top bar: project switcher, search, status, local server indicator
 - Main dashboard: getting-started card, project health, recent sources, conflict summary, wiki pages, handover shortcut
-- Floating help/log affordance: links to `projectwiki log` and diagnostics when startup or ingest fails
+- Floating help/log affordance: links to `whywiki log` and diagnostics when startup or ingest fails
 
 First-run dashboard:
 
@@ -111,11 +111,11 @@ The CLI starts and maintains the local app. The Web UI is where users work.
 Normal users should only need:
 
 ```bash
-projectwiki
+whywiki
 ```
 
 Troubleshooting users should only need:
 
 ```bash
-projectwiki log
+whywiki log
 ```

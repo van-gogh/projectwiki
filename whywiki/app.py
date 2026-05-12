@@ -15,7 +15,7 @@ from .services.ingest import ingest_path
 from .services.wiki_engine import build_project
 from .services.workspace import create_project, get_project, list_projects
 
-app = FastAPI(title="ProjectWiki", version="0.1.0")
+app = FastAPI(title="WhyWiki", version="0.1.0")
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -49,7 +49,7 @@ def index() -> str:
 
 
 def demo_project_root() -> Any:
-    return resources.files("projectwiki").joinpath("demo_project")
+    return resources.files("whywiki").joinpath("demo_project")
 
 
 @app.post("/api/demo")
@@ -58,7 +58,7 @@ def api_demo() -> dict:
     with resources.as_file(root) as root_path:
         if not root_path.exists() or not root_path.is_dir():
             raise HTTPException(status_code=500, detail=f"Demo project assets not found: {root}")
-        project = create_project("Demo Project", "Messy sample project for ProjectWiki")
+        project = create_project("Demo Project", "Messy sample project for WhyWiki")
         ingest = ingest_path(project["id"], root_path)
     build = build_project(project["id"])
     return {"project": project, "ingest": ingest, "build": build}

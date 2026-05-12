@@ -16,7 +16,7 @@ function buildEnv(baseEnv) {
 
   return Object.assign({}, baseEnv, {
     PYTHONPATH: pythonPath,
-    PROJECTWIKI_DATA_DIR: baseEnv.PROJECTWIKI_DATA_DIR || path.join(os.homedir(), ".projectwiki")
+    WHYWIKI_DATA_DIR: baseEnv.WHYWIKI_DATA_DIR || path.join(os.homedir(), ".whywiki")
   });
 }
 
@@ -35,11 +35,11 @@ function exitFromChild(code, signal, proc = process) {
 
 function run(index, passthrough, env) {
   if (index >= candidates.length) {
-    console.error("ProjectWiki could not find Python. Install Python 3.10+ and run again.");
+    console.error("WhyWiki could not find Python. Install Python 3.10+ and run again.");
     process.exit(1);
   }
 
-  const child = spawn(candidates[index], ["-m", "projectwiki.cli"].concat(passthrough), {
+  const child = spawn(candidates[index], ["-m", "whywiki.cli"].concat(passthrough), {
     env,
     stdio: "inherit"
   });

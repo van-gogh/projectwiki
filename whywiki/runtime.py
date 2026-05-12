@@ -48,7 +48,7 @@ class RuntimePaths:
 
     @property
     def log_path(self) -> Path:
-        return self.log_dir / "projectwiki.log"
+        return self.log_dir / "whywiki.log"
 
 
 def default_runtime_paths() -> RuntimePaths:
@@ -102,7 +102,7 @@ def read_runtime_state(paths: RuntimePaths) -> dict[str, Any] | None:
         return None
 
 
-def probe_projectwiki_server(state: dict[str, Any], timeout: float = 0.5) -> bool:
+def probe_whywiki_server(state: dict[str, Any], timeout: float = 0.5) -> bool:
     try:
         host = str(state["host"])
         port = int(state["port"])
@@ -114,7 +114,7 @@ def probe_projectwiki_server(state: dict[str, Any], timeout: float = 0.5) -> boo
             body = response.read(4096).decode("utf-8", errors="replace")
     except (HTTPError, OSError, URLError, TimeoutError, ValueError):
         return False
-    return "ProjectWiki" in body
+    return "WhyWiki" in body
 
 
 def find_listening_process(host: str, port: int) -> ProcessInfo | None:
@@ -162,7 +162,7 @@ def stop_process(pid: int, timeout: float = 5.0) -> None:
 
 def read_active_runtime_state(
     paths: RuntimePaths,
-    probe: Callable[[dict[str, Any]], bool] = probe_projectwiki_server,
+    probe: Callable[[dict[str, Any]], bool] = probe_whywiki_server,
 ) -> dict[str, Any] | None:
     state = read_runtime_state(paths)
     if state is None:
@@ -175,6 +175,6 @@ def read_active_runtime_state(
 
 def read_log_tail(paths: RuntimePaths, lines: int = 80) -> str:
     if not paths.log_path.exists():
-        return "No ProjectWiki log file found.\n"
+        return "No WhyWiki log file found.\n"
     content = paths.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
     return "\n".join(content[-lines:]) + ("\n" if content else "")

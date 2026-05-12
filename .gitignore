@@ -19,7 +19,8 @@ build/
 dist/
 *.egg-info/
 
-# ProjectWiki local data
+# WhyWiki local data
+.whywiki/
 .projectwiki/
 
 # Local implementation worktrees

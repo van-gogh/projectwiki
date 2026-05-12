@@ -1,6 +1,6 @@
-# ProjectWiki First-Board Design
+# WhyWiki First-Board Design
 
-This document is the implementation-facing design for the ProjectWiki first board. It combines the product entry point, local project-memory engine, evidence-backed algorithms, Web dashboard, bilingual UI, demo requirements, and acceptance criteria.
+This document is the implementation-facing design for the WhyWiki first board. It combines the product entry point, local project-memory engine, evidence-backed algorithms, Web dashboard, bilingual UI, demo requirements, and acceptance criteria.
 
 The first board is not a generic RAG chatbot and not a documentation portal. It is a local-first project memory workspace:
 
@@ -18,7 +18,7 @@ local files / git repo / docs / code
 
 ## 1. Product Positioning
 
-ProjectWiki remembers project knowledge and why a project changed. Git remembers code changes; ProjectWiki remembers requirements, decisions, conflicts, handover context, and evidence.
+WhyWiki remembers project knowledge and why a project changed. Git remembers code changes; WhyWiki remembers requirements, decisions, conflicts, handover context, and evidence.
 
 Target users:
 
@@ -35,53 +35,53 @@ The first board must feel like a usable local product, not a source-code demo. I
 The target public entry point is npm-first:
 
 ```bash
-npm install -g projectwiki
-projectwiki
+npm install -g whywiki
+whywiki
 ```
 
-`projectwiki` starts the local Web app quietly, initializes the data directory, uses the default local URL, and prints a clickable link:
+`whywiki` starts the local Web app quietly, initializes the data directory, uses the default local URL, and prints a clickable link:
 
 ```text
-ProjectWiki is running locally.
+WhyWiki is running locally.
 
 Open:
 http://127.0.0.1:8765
 
 Logs:
-projectwiki log
+whywiki log
 
 Data:
-~/.projectwiki
+~/.whywiki
 ```
 
-Normal users should only need `projectwiki`. Troubleshooting users should only need `projectwiki log`.
+Normal users should only need `whywiki`. Troubleshooting users should only need `whywiki log`.
 
 ## 3. Local App Launcher
 
-The npm package is a launcher for the local ProjectWiki app.
+The npm package is a launcher for the local WhyWiki app.
 
 Required commands:
 
 ```bash
-projectwiki          # start quietly, print the local Web URL
-projectwiki open     # open the current Web UI
-projectwiki status   # show running state, port, version, and data directory
-projectwiki log      # show logs for the current or most recent startup
-projectwiki stop     # stop the local background service
-projectwiki doctor   # diagnose port, runtime, and data directory problems
+whywiki          # start quietly, print the local Web URL
+whywiki open     # open the current Web UI
+whywiki status   # show running state, port, version, and data directory
+whywiki log      # show logs for the current or most recent startup
+whywiki stop     # stop the local background service
+whywiki doctor   # diagnose port, runtime, and data directory problems
 ```
 
 Launcher behavior:
 
 - default host is `127.0.0.1`
 - default port is `8765`
-- if the port is occupied by a running ProjectWiki instance, show the current port, process id, startup information, and ask whether to continue using it or restart ProjectWiki
-- if the port is occupied by another process, show the process information and ask whether to kill that process and start ProjectWiki or cancel startup
+- if the port is occupied by a running WhyWiki instance, show the current port, process id, startup information, and ask whether to continue using it or restart WhyWiki
+- if the port is occupied by another process, show the process information and ask whether to kill that process and start WhyWiki or cancel startup
 - the launcher must not choose a random fallback port automatically
-- default data directory is `~/.projectwiki`
-- logs are written to `~/.projectwiki/logs/projectwiki.log`
-- pid and runtime metadata are written under `~/.projectwiki/run/`
-- repeated `projectwiki` calls are idempotent
+- default data directory is `~/.whywiki`
+- logs are written to `~/.whywiki/logs/whywiki.log`
+- pid and runtime metadata are written under `~/.whywiki/run/`
+- repeated `whywiki` calls are idempotent
 
 The launcher must not require users to understand Python virtual environments, uvicorn, Docker, process IDs, or log redirection.
 
@@ -146,7 +146,7 @@ Input sources:
 Ingestion behavior:
 
 - walk supported files only
-- ignore `.git`, `.venv`, `node_modules`, build outputs, caches, and `.projectwiki`
+- ignore `.git`, `.venv`, `node_modules`, build outputs, caches, and `.whywiki`
 - compute file content hashes
 - skip unchanged sources
 - update changed sources and replace their blocks
@@ -360,7 +360,7 @@ Wiki rules:
 
 ## 11. Handover Generation
 
-The handover pack is the first-board feature that proves ProjectWiki is more than Q&A.
+The handover pack is the first-board feature that proves WhyWiki is more than Q&A.
 
 Required sections:
 
@@ -504,7 +504,7 @@ status.needsReview
 
 ## 15. Demo Project Requirements
 
-The demo project must reliably show ProjectWiki's value in under one minute.
+The demo project must reliably show WhyWiki's value in under one minute.
 
 Required demo signals:
 
@@ -567,11 +567,11 @@ Do not build these in the first board:
 
 Startup:
 
-- user can install with `npm install -g projectwiki`
-- user can run `projectwiki`
+- user can install with `npm install -g whywiki`
+- user can run `whywiki`
 - the command opens or prints a local URL
 - repeated starts reuse the running service
-- `projectwiki log` shows current or most recent startup logs
+- `whywiki log` shows current or most recent startup logs
 
 Web:
 
@@ -601,7 +601,7 @@ Demo:
 Engineering:
 
 - behavior is covered by focused tests
-- `python -m compileall projectwiki` passes
+- `python -m compileall whywiki` passes
 - `python -m pytest -q` passes
 - heavy optional dependencies remain lazy
 - functions remain testable without FastAPI where practical

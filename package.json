@@ -1,17 +1,17 @@
 {
-  "name": "projectwiki",
+  "name": "whywiki",
   "version": "0.1.0",
   "description": "Local-first project memory and AI-maintained wiki for messy software projects.",
   "license": "MIT",
   "type": "commonjs",
   "bin": {
-    "projectwiki": "npm/projectwiki.js"
+    "whywiki": "npm/whywiki.js"
   },
   "files": [
     "npm",
-    "projectwiki",
-    "!projectwiki/**/__pycache__/",
-    "!projectwiki/**/*.pyc",
+    "whywiki",
+    "!whywiki/**/__pycache__/",
+    "!whywiki/**/*.pyc",
     "pyproject.toml",
     "README.md",
     "LICENSE"

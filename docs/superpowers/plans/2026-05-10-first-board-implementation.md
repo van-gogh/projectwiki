@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the ProjectWiki first board: npm-first local launch, logs, stronger project-memory data, deterministic ingestion/facts/conflicts, evidence-backed wiki/handover/ask, and a bilingual dashboard UI.
+**Goal:** Build the WhyWiki first board: npm-first local launch, logs, stronger project-memory data, deterministic ingestion/facts/conflicts, evidence-backed wiki/handover/ask, and a bilingual dashboard UI.
 
 **Architecture:** Keep the existing FastAPI + SQLite + static Web architecture, then add focused modules around it. The Python CLI becomes the reliable local service layer; an npm launcher wraps it. The Web UI calls local JSON APIs and renders bilingual dashboard chrome while preserving source evidence in its original language.
 
@@ -18,22 +18,22 @@ This is a broad first-board plan, so it is split into independently shippable ta
 
 Create or modify these files:
 
-- `projectwiki/db.py`: schema migrations and indexes.
-- `projectwiki/runtime.py`: local runtime metadata, logs, status, port selection.
-- `projectwiki/cli.py`: `projectwiki`, `open`, `status`, `log`, `stop`, `doctor`, and current developer commands.
-- `projectwiki/app.py`: Web API endpoints for dashboard, sources, blocks, facts, logs, and conflict status.
-- `projectwiki/services/ingest.py`: source update behavior and parse diagnostics.
-- `projectwiki/services/fact_extractor.py`: fact status, validity status, confidence handling.
-- `projectwiki/services/conflict_detector.py`: deployment-model mismatch and stronger evidence.
-- `projectwiki/services/wiki_engine.py`: evidence rendering and uncertainty labels.
-- `projectwiki/services/handover.py`: evidence-first handover sections.
-- `projectwiki/services/ask.py`: structured evidence and insufficient-evidence behavior.
-- `projectwiki/static/index.html`: dashboard shell.
-- `projectwiki/static/styles.css`: dashboard visual system.
-- `projectwiki/static/app.js`: API client and dashboard behavior.
-- `projectwiki/static/i18n.js`: Chinese/English UI strings and language selection.
+- `whywiki/db.py`: schema migrations and indexes.
+- `whywiki/runtime.py`: local runtime metadata, logs, status, port selection.
+- `whywiki/cli.py`: `whywiki`, `open`, `status`, `log`, `stop`, `doctor`, and current developer commands.
+- `whywiki/app.py`: Web API endpoints for dashboard, sources, blocks, facts, logs, and conflict status.
+- `whywiki/services/ingest.py`: source update behavior and parse diagnostics.
+- `whywiki/services/fact_extractor.py`: fact status, validity status, confidence handling.
+- `whywiki/services/conflict_detector.py`: deployment-model mismatch and stronger evidence.
+- `whywiki/services/wiki_engine.py`: evidence rendering and uncertainty labels.
+- `whywiki/services/handover.py`: evidence-first handover sections.
+- `whywiki/services/ask.py`: structured evidence and insufficient-evidence behavior.
+- `whywiki/static/index.html`: dashboard shell.
+- `whywiki/static/styles.css`: dashboard visual system.
+- `whywiki/static/app.js`: API client and dashboard behavior.
+- `whywiki/static/i18n.js`: Chinese/English UI strings and language selection.
 - `package.json`: npm package entry and bin command.
-- `npm/projectwiki.js`: Node launcher that calls the Python runtime.
+- `npm/whywiki.js`: Node launcher that calls the Python runtime.
 - `tests/test_schema_migration.py`: schema and backward-compatibility tests.
 - `tests/test_runtime_cli.py`: runtime/log/status behavior tests.
 - `tests/test_api_surface.py`: API visibility tests.
@@ -46,7 +46,7 @@ Create or modify these files:
 ### Task 1: Schema Migration And Evidence Fields
 
 **Files:**
-- Modify: `projectwiki/db.py`
+- Modify: `whywiki/db.py`
 - Test: `tests/test_schema_migration.py`
 
 - [ ] **Step 1: Write failing migration tests**
@@ -56,7 +56,7 @@ Create `tests/test_schema_migration.py`:
 ```python
 import sqlite3
 
-from projectwiki.db import init_db
+from whywiki.db import init_db
 
 
 def columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -65,7 +65,7 @@ def columns(conn: sqlite3.Connection, table: str) -> set[str]:
 
 
 def test_init_db_adds_schema_version_and_review_fields(tmp_path):
-    db_path = tmp_path / "projectwiki.db"
+    db_path = tmp_path / "whywiki.db"
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
 
@@ -79,7 +79,7 @@ def test_init_db_adds_schema_version_and_review_fields(tmp_path):
 
 
 def test_init_db_is_idempotent(tmp_path):
-    db_path = tmp_path / "projectwiki.db"
+    db_path = tmp_path / "whywiki.db"
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
 
@@ -101,7 +101,7 @@ Expected: FAIL because `schema_version`, `projects.status`, `sources.version_hin
 
 - [ ] **Step 3: Implement lightweight migrations**
 
-Modify `projectwiki/db.py` by adding helpers:
+Modify `whywiki/db.py` by adding helpers:
 
 ```python
 def table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
@@ -144,7 +144,7 @@ Expected: PASS.
 Run:
 
 ```bash
-python -m compileall projectwiki
+python -m compileall whywiki
 python -m pytest -q
 ```
 
@@ -153,7 +153,7 @@ Expected: both commands pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projectwiki/db.py tests/test_schema_migration.py
+git add whywiki/db.py tests/test_schema_migration.py
 git commit -m "feat: add schema migrations"
 ```
 
@@ -162,8 +162,8 @@ git commit -m "feat: add schema migrations"
 ### Task 2: Runtime Status, Logs, And Python CLI Launcher
 
 **Files:**
-- Create: `projectwiki/runtime.py`
-- Modify: `projectwiki/cli.py`
+- Create: `whywiki/runtime.py`
+- Modify: `whywiki/cli.py`
 - Test: `tests/test_runtime_cli.py`
 
 - [ ] **Step 1: Write runtime tests**
@@ -171,7 +171,7 @@ git commit -m "feat: add schema migrations"
 Create `tests/test_runtime_cli.py`:
 
 ```python
-from projectwiki.runtime import (
+from whywiki.runtime import (
     RuntimePaths,
     choose_port,
     read_log_tail,
@@ -214,11 +214,11 @@ Run:
 python -m pytest tests/test_runtime_cli.py -q
 ```
 
-Expected: FAIL because `projectwiki.runtime` does not exist.
+Expected: FAIL because `whywiki.runtime` does not exist.
 
 - [ ] **Step 3: Implement runtime helpers**
 
-Create `projectwiki/runtime.py`:
+Create `whywiki/runtime.py`:
 
 ```python
 from __future__ import annotations
@@ -249,11 +249,11 @@ class RuntimePaths:
 
     @property
     def log_path(self) -> Path:
-        return self.log_dir / "projectwiki.log"
+        return self.log_dir / "whywiki.log"
 
 
 def default_runtime_paths() -> RuntimePaths:
-    root = Path(os.getenv("PROJECTWIKI_DATA_DIR", "~/.projectwiki")).expanduser().resolve()
+    root = Path(os.getenv("WHYWIKI_DATA_DIR", "~/.whywiki")).expanduser().resolve()
     return RuntimePaths(root)
 
 
@@ -277,14 +277,14 @@ def read_runtime_state(paths: RuntimePaths) -> dict[str, Any] | None:
 
 def read_log_tail(paths: RuntimePaths, lines: int = 80) -> str:
     if not paths.log_path.exists():
-        return "No ProjectWiki log file found.\n"
+        return "No WhyWiki log file found.\n"
     content = paths.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
     return "\n".join(content[-lines:]) + ("\n" if content else "")
 ```
 
 - [ ] **Step 4: Extend CLI command surface**
 
-Modify `projectwiki/cli.py`:
+Modify `whywiki/cli.py`:
 
 ```python
 from .runtime import default_runtime_paths, read_log_tail, read_runtime_state
@@ -349,7 +349,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projectwiki/runtime.py projectwiki/cli.py tests/test_runtime_cli.py
+git add whywiki/runtime.py whywiki/cli.py tests/test_runtime_cli.py
 git commit -m "feat: add runtime status and logs"
 ```
 
@@ -359,7 +359,7 @@ git commit -m "feat: add runtime status and logs"
 
 **Files:**
 - Create: `package.json`
-- Create: `npm/projectwiki.js`
+- Create: `npm/whywiki.js`
 - Test: `tests/test_npm_launcher.py`
 
 - [ ] **Step 1: Write launcher file tests**
@@ -374,18 +374,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_package_json_exposes_projectwiki_bin():
+def test_package_json_exposes_whywiki_bin():
     package = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))
 
-    assert package["name"] == "projectwiki"
-    assert package["bin"]["projectwiki"] == "npm/projectwiki.js"
+    assert package["name"] == "whywiki"
+    assert package["bin"]["whywiki"] == "npm/whywiki.js"
 
 
 def test_node_launcher_delegates_to_python_cli():
-    script = (ROOT / "npm" / "projectwiki.js").read_text(encoding="utf-8")
+    script = (ROOT / "npm" / "whywiki.js").read_text(encoding="utf-8")
 
     assert "python" in script
-    assert "projectwiki.cli" in script
+    assert "whywiki.cli" in script
     assert "spawn" in script
 ```
 
@@ -397,7 +397,7 @@ Run:
 python -m pytest tests/test_npm_launcher.py -q
 ```
 
-Expected: FAIL because `package.json` and `npm/projectwiki.js` do not exist.
+Expected: FAIL because `package.json` and `npm/whywiki.js` do not exist.
 
 - [ ] **Step 3: Add package metadata**
 
@@ -405,17 +405,17 @@ Create `package.json`:
 
 ```json
 {
-  "name": "projectwiki",
+  "name": "whywiki",
   "version": "0.1.0",
   "description": "Local-first project memory and AI-maintained wiki for messy software projects.",
   "license": "MIT",
   "type": "commonjs",
   "bin": {
-    "projectwiki": "npm/projectwiki.js"
+    "whywiki": "npm/whywiki.js"
   },
   "files": [
     "npm",
-    "projectwiki",
+    "whywiki",
     "pyproject.toml",
     "README.md",
     "LICENSE"
@@ -428,7 +428,7 @@ Create `package.json`:
 
 - [ ] **Step 4: Add Node launcher**
 
-Create `npm/projectwiki.js`:
+Create `npm/whywiki.js`:
 
 ```javascript
 #!/usr/bin/env node
@@ -443,11 +443,11 @@ const candidates = process.platform === "win32"
 
 function run(index) {
   if (index >= candidates.length) {
-    console.error("ProjectWiki could not find Python. Install Python 3.10+ and run again.");
+    console.error("WhyWiki could not find Python. Install Python 3.10+ and run again.");
     process.exit(1);
   }
 
-  const child = spawn(candidates[index], ["-m", "projectwiki.cli"].concat(passthrough), {
+  const child = spawn(candidates[index], ["-m", "whywiki.cli"].concat(passthrough), {
     stdio: "inherit"
   });
 
@@ -472,7 +472,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add package.json npm/projectwiki.js tests/test_npm_launcher.py
+git add package.json npm/whywiki.js tests/test_npm_launcher.py
 git commit -m "feat: add npm launcher"
 ```
 
@@ -481,7 +481,7 @@ git commit -m "feat: add npm launcher"
 ### Task 4: Dashboard API Surface
 
 **Files:**
-- Modify: `projectwiki/app.py`
+- Modify: `whywiki/app.py`
 - Test: `tests/test_api_surface.py`
 
 - [ ] **Step 1: Write API surface tests**
@@ -493,14 +493,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from projectwiki.app import app
-from projectwiki.services.ingest import ingest_path
-from projectwiki.services.wiki_engine import build_project
-from projectwiki.services.workspace import create_project
+from whywiki.app import app
+from whywiki.services.ingest import ingest_path
+from whywiki.services.wiki_engine import build_project
+from whywiki.services.workspace import create_project
 
 
 def test_dashboard_api_lists_sources_facts_and_blocks(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     client = TestClient(app)
     project = create_project("Demo")
     root = Path(__file__).resolve().parents[1] / "examples" / "demo-project"
@@ -533,7 +533,7 @@ Expected: FAIL because source, block, and fact endpoints do not exist.
 
 - [ ] **Step 3: Add endpoints**
 
-Modify `projectwiki/app.py`:
+Modify `whywiki/app.py`:
 
 ```python
 @app.get("/api/projects/{project_id}/sources")
@@ -572,7 +572,7 @@ def api_list_facts(project_id: str) -> list[dict]:
 
 - [ ] **Step 4: Add conflict status endpoint**
 
-Extend `projectwiki/app.py`:
+Extend `whywiki/app.py`:
 
 ```python
 class ConflictStatusRequest(BaseModel):
@@ -612,7 +612,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projectwiki/app.py tests/test_api_surface.py
+git add whywiki/app.py tests/test_api_surface.py
 git commit -m "feat: expose dashboard APIs"
 ```
 
@@ -621,7 +621,7 @@ git commit -m "feat: expose dashboard APIs"
 ### Task 5: Conflict Detection Enhancements
 
 **Files:**
-- Modify: `projectwiki/services/conflict_detector.py`
+- Modify: `whywiki/services/conflict_detector.py`
 - Test: `tests/test_conflict_detector.py`
 
 - [ ] **Step 1: Write deterministic conflict tests**
@@ -631,10 +631,10 @@ Create `tests/test_conflict_detector.py`:
 ```python
 from pathlib import Path
 
-from projectwiki.db import connect, init_db
-from projectwiki.services.conflict_detector import detect_conflicts
-from projectwiki.services.ingest import ingest_path
-from projectwiki.services.workspace import create_project
+from whywiki.db import connect, init_db
+from whywiki.services.conflict_detector import detect_conflicts
+from whywiki.services.ingest import ingest_path
+from whywiki.services.workspace import create_project
 
 
 def conflict_types(conn, project_id: str) -> set[str]:
@@ -646,7 +646,7 @@ def conflict_types(conn, project_id: str) -> set[str]:
 
 
 def test_demo_project_conflicts(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     conn = connect()
     init_db(conn)
     project = create_project("Demo", conn=conn)
@@ -675,7 +675,7 @@ Expected: PASS with existing rules, or FAIL if demo output is below the first-bo
 
 - [ ] **Step 3: Add deployment model mismatch rule**
 
-Modify `projectwiki/services/conflict_detector.py`:
+Modify `whywiki/services/conflict_detector.py`:
 
 ```python
 MODEL_VERSION_RE = re.compile(r"\bmodel[_-]?v?(\d+)\b|model_v(\d+)\.pkl", re.IGNORECASE)
@@ -744,7 +744,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projectwiki/services/conflict_detector.py tests/test_conflict_detector.py
+git add whywiki/services/conflict_detector.py tests/test_conflict_detector.py
 git commit -m "feat: strengthen conflict detection"
 ```
 
@@ -753,9 +753,9 @@ git commit -m "feat: strengthen conflict detection"
 ### Task 6: Evidence-Backed Ask, Wiki, And Handover
 
 **Files:**
-- Modify: `projectwiki/services/ask.py`
-- Modify: `projectwiki/services/wiki_engine.py`
-- Modify: `projectwiki/services/handover.py`
+- Modify: `whywiki/services/ask.py`
+- Modify: `whywiki/services/wiki_engine.py`
+- Modify: `whywiki/services/handover.py`
 - Test: `tests/test_evidence_outputs.py`
 
 - [ ] **Step 1: Write evidence output tests**
@@ -765,14 +765,14 @@ Create `tests/test_evidence_outputs.py`:
 ```python
 from pathlib import Path
 
-from projectwiki.services.ask import ask_project
-from projectwiki.services.ingest import ingest_path
-from projectwiki.services.wiki_engine import build_project
-from projectwiki.services.workspace import create_project
+from whywiki.services.ask import ask_project
+from whywiki.services.ingest import ingest_path
+from whywiki.services.wiki_engine import build_project
+from whywiki.services.workspace import create_project
 
 
 def build_demo(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     project = create_project("Demo")
     root = Path(__file__).resolve().parents[1] / "examples" / "demo-project"
     ingest_path(project["id"], root)
@@ -811,7 +811,7 @@ Expected: the second test may FAIL if weak token overlap returns unrelated evide
 
 - [ ] **Step 3: Tighten Ask threshold**
 
-Modify `projectwiki/services/ask.py`:
+Modify `whywiki/services/ask.py`:
 
 ```python
 MIN_SCORE = 2.0
@@ -831,7 +831,7 @@ Change both candidate filters:
 
 - [ ] **Step 4: Add evidence labels to generated wiki pages**
 
-Modify `render_fact_page` in `projectwiki/services/wiki_engine.py`:
+Modify `render_fact_page` in `whywiki/services/wiki_engine.py`:
 
 ```python
         status = fact["status"]
@@ -853,7 +853,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add projectwiki/services/ask.py projectwiki/services/wiki_engine.py projectwiki/services/handover.py tests/test_evidence_outputs.py
+git add whywiki/services/ask.py whywiki/services/wiki_engine.py whywiki/services/handover.py tests/test_evidence_outputs.py
 git commit -m "feat: tighten evidence-backed outputs"
 ```
 
@@ -862,10 +862,10 @@ git commit -m "feat: tighten evidence-backed outputs"
 ### Task 7: Bilingual Dashboard Assets
 
 **Files:**
-- Modify: `projectwiki/static/index.html`
-- Create: `projectwiki/static/styles.css`
-- Create: `projectwiki/static/i18n.js`
-- Create: `projectwiki/static/app.js`
+- Modify: `whywiki/static/index.html`
+- Create: `whywiki/static/styles.css`
+- Create: `whywiki/static/i18n.js`
+- Create: `whywiki/static/app.js`
 - Test: `tests/test_web_assets.py`
 
 - [ ] **Step 1: Write Web asset tests**
@@ -877,7 +877,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STATIC = ROOT / "projectwiki" / "static"
+STATIC = ROOT / "whywiki" / "static"
 
 
 def test_dashboard_assets_exist():
@@ -909,10 +909,10 @@ Expected: FAIL because the new asset files do not exist.
 
 - [ ] **Step 3: Add i18n dictionary**
 
-Create `projectwiki/static/i18n.js`:
+Create `whywiki/static/i18n.js`:
 
 ```javascript
-window.ProjectWikiI18n = {
+window.WhyWikiI18n = {
   "en-US": {
     "nav.projects": "Projects",
     "nav.sources": "Sources",
@@ -927,7 +927,7 @@ window.ProjectWikiI18n = {
     "action.ingest": "Ingest local folder",
     "action.buildWiki": "Build wiki",
     "empty.noProjects": "No projects yet",
-    "error.readLogs": "Run projectwiki log to inspect startup logs."
+    "error.readLogs": "Run whywiki log to inspect startup logs."
   },
   "zh-CN": {
     "nav.projects": "项目",
@@ -943,14 +943,14 @@ window.ProjectWikiI18n = {
     "action.ingest": "摄入本地文件夹",
     "action.buildWiki": "生成 Wiki",
     "empty.noProjects": "还没有项目",
-    "error.readLogs": "运行 projectwiki log 查看启动日志。"
+    "error.readLogs": "运行 whywiki log 查看启动日志。"
   }
 };
 ```
 
 - [ ] **Step 4: Replace static page with dashboard shell**
 
-Modify `projectwiki/static/index.html` to load the assets:
+Modify `whywiki/static/index.html` to load the assets:
 
 ```html
 <!doctype html>
@@ -958,12 +958,12 @@ Modify `projectwiki/static/index.html` to load the assets:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ProjectWiki</title>
+  <title>WhyWiki</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <aside class="sidebar">
-    <div class="brand">ProjectWiki</div>
+    <div class="brand">WhyWiki</div>
     <nav>
       <button data-i18n="nav.projects"></button>
       <button data-i18n="nav.sources"></button>
@@ -1004,24 +1004,24 @@ Modify `projectwiki/static/index.html` to load the assets:
 
 - [ ] **Step 5: Add dashboard behavior and styles**
 
-Create `projectwiki/static/app.js`:
+Create `whywiki/static/app.js`:
 
 ```javascript
 const supportedLanguages = ["zh-CN", "en-US"];
 
 function initialLanguage() {
-  const saved = localStorage.getItem("projectwiki.language");
+  const saved = localStorage.getItem("whywiki.language");
   if (supportedLanguages.includes(saved)) return saved;
   return navigator.language && navigator.language.startsWith("zh") ? "zh-CN" : "en-US";
 }
 
 function translate(lang) {
-  const dict = window.ProjectWikiI18n[lang];
+  const dict = window.WhyWikiI18n[lang];
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-i18n]").forEach((node) => {
     node.textContent = dict[node.dataset.i18n] || node.dataset.i18n;
   });
-  localStorage.setItem("projectwiki.language", lang);
+  localStorage.setItem("whywiki.language", lang);
 }
 
 document.querySelectorAll("[data-lang]").forEach((button) => {
@@ -1031,7 +1031,7 @@ document.querySelectorAll("[data-lang]").forEach((button) => {
 translate(initialLanguage());
 ```
 
-Create `projectwiki/static/styles.css`:
+Create `whywiki/static/styles.css`:
 
 ```css
 :root {
@@ -1143,7 +1143,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add projectwiki/static/index.html projectwiki/static/styles.css projectwiki/static/i18n.js projectwiki/static/app.js tests/test_web_assets.py
+git add whywiki/static/index.html whywiki/static/styles.css whywiki/static/i18n.js whywiki/static/app.js tests/test_web_assets.py
 git commit -m "feat: add bilingual dashboard shell"
 ```
 
@@ -1152,8 +1152,8 @@ git commit -m "feat: add bilingual dashboard shell"
 ### Task 8: Demo-First Web Flow And README
 
 **Files:**
-- Modify: `projectwiki/app.py`
-- Modify: `projectwiki/static/app.js`
+- Modify: `whywiki/app.py`
+- Modify: `whywiki/static/app.js`
 - Modify: `README.md`
 - Test: `tests/test_demo_flow.py`
 
@@ -1164,11 +1164,11 @@ Create `tests/test_demo_flow.py`:
 ```python
 from fastapi.testclient import TestClient
 
-from projectwiki.app import app
+from whywiki.app import app
 
 
 def test_demo_project_endpoint_builds_demo(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     client = TestClient(app)
 
     response = client.post("/api/demo")
@@ -1192,13 +1192,13 @@ Expected: FAIL because `/api/demo` does not exist.
 
 - [ ] **Step 3: Implement demo endpoint**
 
-Modify `projectwiki/app.py`:
+Modify `whywiki/app.py`:
 
 ```python
 @app.post("/api/demo")
 def api_create_demo() -> dict:
     root = Path(__file__).resolve().parents[1] / "examples" / "demo-project"
-    project = create_project("Demo Project", "Messy sample project for ProjectWiki")
+    project = create_project("Demo Project", "Messy sample project for WhyWiki")
     ingest = ingest_path(project["id"], root)
     build = build_project(project["id"])
     return {"project": project, "ingest": ingest, "build": build}
@@ -1206,7 +1206,7 @@ def api_create_demo() -> dict:
 
 - [ ] **Step 4: Wire `Use demo project` button**
 
-Modify `projectwiki/static/app.js`:
+Modify `whywiki/static/app.js`:
 
 ```javascript
 async function api(path, options = {}) {
@@ -1227,7 +1227,7 @@ async function useDemoProject() {
     const result = await api("/api/demo", { method: "POST" });
     root.textContent = JSON.stringify(result, null, 2);
   } catch (error) {
-    root.textContent = `${error.message}\n\n${window.ProjectWikiI18n[initialLanguage()]["error.readLogs"]}`;
+    root.textContent = `${error.message}\n\n${window.WhyWikiI18n[initialLanguage()]["error.readLogs"]}`;
   }
 }
 
@@ -1242,8 +1242,8 @@ Modify `README.md` product startup section:
 ## First-board product target
 
 ```bash
-npm install -g projectwiki
-projectwiki
+npm install -g whywiki
+whywiki
 ```
 
 Open the printed local URL, click `Use demo project`, then inspect Conflicts, Wiki, Handover, and Ask with evidence.
@@ -1263,7 +1263,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add projectwiki/app.py projectwiki/static/app.js README.md tests/test_demo_flow.py
+git add whywiki/app.py whywiki/static/app.js README.md tests/test_demo_flow.py
 git commit -m "feat: add demo-first web flow"
 ```
 
@@ -1279,7 +1279,7 @@ git commit -m "feat: add demo-first web flow"
 Run:
 
 ```bash
-python -m compileall projectwiki
+python -m compileall whywiki
 ```
 
 Expected: exit code 0.
@@ -1299,12 +1299,12 @@ Expected: all tests pass.
 Run:
 
 ```bash
-projectwiki --help
-projectwiki doctor
-projectwiki log
+whywiki --help
+whywiki doctor
+whywiki log
 ```
 
-Expected: help prints available commands, doctor prints JSON, log prints either log content or `No ProjectWiki log file found.`
+Expected: help prints available commands, doctor prints JSON, log prints either log content or `No WhyWiki log file found.`
 
 - [ ] **Step 4: Run demo through API**
 
@@ -1332,7 +1332,7 @@ Expected: no uncommitted changes after the task commits. If a verification comma
 
 Spec coverage:
 
-- Startup and `projectwiki log`: Tasks 2 and 3.
+- Startup and `whywiki log`: Tasks 2 and 3.
 - Schema and evidence fields: Task 1.
 - API visibility: Task 4.
 - Conflict algorithms: Task 5.

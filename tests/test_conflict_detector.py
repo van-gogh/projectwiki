@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from projectwiki.db import connect, init_db
-from projectwiki.services.conflict_detector import detect_conflicts
-from projectwiki.services.ingest import ingest_path
-from projectwiki.services.workspace import create_project
-from projectwiki.utils import from_json
+from whywiki.db import connect, init_db
+from whywiki.services.conflict_detector import detect_conflicts
+from whywiki.services.ingest import ingest_path
+from whywiki.services.workspace import create_project
+from whywiki.utils import from_json
 
 
 def conflict_types(conn, project_id: str) -> set[str]:
@@ -26,7 +26,7 @@ def conflict_row(conn, project_id: str, conflict_type: str):
 
 
 def create_ingested_project(tmp_path, monkeypatch, files: dict[str, str]):
-    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     conn = connect()
     init_db(conn)
     project = create_project("Demo", conn=conn)
@@ -41,7 +41,7 @@ def create_ingested_project(tmp_path, monkeypatch, files: dict[str, str]):
 
 
 def test_demo_project_conflicts(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     conn = connect()
     init_db(conn)
     project = create_project("Demo", conn=conn)

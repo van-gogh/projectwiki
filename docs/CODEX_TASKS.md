@@ -20,36 +20,36 @@
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
-python -m compileall projectwiki
+python -m compileall whywiki
 python -m pytest -q
-projectwiki init-db
-projectwiki create "Demo Project"
+whywiki init-db
+whywiki create "Demo Project"
 ```
 
 验收：命令无错误。
 
 ## Task 0.5：产品化启动入口
 
-目标：让 ProjectWiki 像现代 CLI 产品一样从一行命令进入 Web 工作台，而不是要求用户先 clone 仓库。
+目标：让 WhyWiki 像现代 CLI 产品一样从一行命令进入 Web 工作台，而不是要求用户先 clone 仓库。
 
 目标入口：
 
 ```bash
-npm install -g projectwiki
-projectwiki
+npm install -g whywiki
+whywiki
 ```
 
 要求：
 
-- `projectwiki` 静默启动本地 Web 服务，并输出可点击链接。
-- 如果 ProjectWiki 已占用默认端口，输出当前端口、进程和启动信息，并让用户选择继续使用或重启 ProjectWiki。
+- `whywiki` 静默启动本地 Web 服务，并输出可点击链接。
+- 如果 WhyWiki 已占用默认端口，输出当前端口、进程和启动信息，并让用户选择继续使用或重启 WhyWiki。
 - 如果其它进程占用默认端口，输出占用进程信息，并让用户选择杀掉占用进程后启动或取消启动。
 - 默认使用 `127.0.0.1:8765`，不自动 fallback 到随机端口。
-- 数据目录默认放在 `~/.projectwiki`。
-- 增加 `projectwiki log` 查看本次或最近一次启动日志。
-- 保留 `projectwiki status`、`open`、`stop`、`doctor` 的扩展空间。
+- 数据目录默认放在 `~/.whywiki`。
+- 增加 `whywiki log` 查看本次或最近一次启动日志。
+- 保留 `whywiki status`、`open`、`stop`、`doctor` 的扩展空间。
 
-验收：用户不需要 clone 仓库、不需要理解 Python/Docker，也能打开可用 Web 界面；启动失败时能通过 `projectwiki log` 定位原因。
+验收：用户不需要 clone 仓库、不需要理解 Python/Docker，也能打开可用 Web 界面；启动失败时能通过 `whywiki log` 定位原因。
 
 ## Task 1：强化数据模型与 schema
 
@@ -88,7 +88,7 @@ projectwiki
 - LLM 输出必须是 JSON，并通过 schema 校验。
 - 低置信度事实标记为 `needs_review`。
 
-验收：`projectwiki build` 后 facts 数量合理，且每条 fact 有 evidence。
+验收：`whywiki build` 后 facts 数量合理，且每条 fact 有 evidence。
 
 ## Task 4：冲突检测
 
@@ -145,7 +145,7 @@ projectwiki
 - Ask
 - Settings
 
-验收：执行 `projectwiki` 后进入 Web UI，不用命令行也能完成首板闭环；启动或摄入失败时，界面应提示用户可运行 `projectwiki log` 查看日志。
+验收：执行 `whywiki` 后进入 Web UI，不用命令行也能完成首板闭环；启动或摄入失败时，界面应提示用户可运行 `whywiki log` 查看日志。
 
 ## Task 7：示例项目和 README 传播
 

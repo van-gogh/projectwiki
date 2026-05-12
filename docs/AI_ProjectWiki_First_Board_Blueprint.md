@@ -1,27 +1,27 @@
-# AI Project Wiki / Project Memory 首板蓝图
+# AI WhyWiki / Project Memory 首板蓝图
 
 > 版本：v0.1 首板设计稿  
 > 目标：把当前讨论沉淀成一个可以交给 Codex 继续开发的产品蓝图。  
-> 核心定位：面向个人开发者、高校实验室、小团队、开源项目和混乱软件项目的开源 AI Project Wiki。
+> 核心定位：面向个人开发者、高校实验室、小团队、开源项目和混乱软件项目的开源 AI WhyWiki。
 
 ---
 
 ## 0. 一句话定义
 
-ProjectWiki 是一个开源的项目记忆工具。它把 Git 仓库、Word、PDF、Excel、Markdown、实验记录、会议纪要和在线表格整理成一个可追溯、可问答、可交接、可审查的 AI 项目 Wiki。
+WhyWiki 是一个开源的项目记忆工具。它把 Git 仓库、Word、PDF、Excel、Markdown、实验记录、会议纪要和在线表格整理成一个可追溯、可问答、可交接、可审查的 AI 项目 Wiki。
 
 更有传播性的表达：
 
 ```text
 Git remembers your code.
-ProjectWiki remembers your project.
+WhyWiki remembers your project.
 ```
 
 中文表达：
 
 ```text
 Git 记住代码怎么变。
-ProjectWiki 记住项目为什么变。
+WhyWiki 记住项目为什么变。
 ```
 
 首板不做“企业知识管理平台”，而是做：
@@ -64,7 +64,7 @@ ProjectWiki 记住项目为什么变。
 
 ```bash
 git init
-projectwiki init
+whywiki init
 ```
 
 它要像 Git 一样成为项目启动时的默认工具之一，但它管理的不是代码版本，而是项目知识、需求、决策、交接和文档有效性。
@@ -141,7 +141,7 @@ Wiki 负责解释：
 
 ### 2.1 它是什么
 
-ProjectWiki 是：
+WhyWiki 是：
 
 - 项目记忆工具
 - 项目事实层
@@ -153,7 +153,7 @@ ProjectWiki 是：
 
 ### 2.2 它不是什么
 
-ProjectWiki 不是：
+WhyWiki 不是：
 
 - 普通 RAG 问答
 - 网盘
@@ -173,7 +173,7 @@ ProjectWiki 不是：
 上传文档 -> 检索 -> 问答
 ```
 
-ProjectWiki 的模式是：
+WhyWiki 的模式是：
 
 ```text
 摄入项目材料 -> 抽取事实 -> 判断有效性 -> 发现冲突 -> 生成 Wiki -> 生成交接包 -> 带证据问答
@@ -238,7 +238,7 @@ ProjectWiki 的模式是：
 4. 生成 Source Blocks
 5. 抽取 Project Facts
 6. 检测冲突
-7. 生成 AI Project Wiki
+7. 生成 AI WhyWiki
 8. 生成 Handover Pack
 9. 支持 Ask with Evidence
 10. Web UI 展示结果
@@ -274,7 +274,7 @@ Connectors
 推荐目录结构：
 
 ```text
-projectwiki/
+whywiki/
 ├── web/                  # Web UI，首板可以先静态页，后续 Next.js / React
 ├── server/               # API 层，首板可用 FastAPI
 ├── workers/              # 异步任务，后续再加
@@ -300,7 +300,7 @@ projectwiki/
 │   ├── handover_engine
 │   └── ask_engine
 ├── storage/              # SQLite/Postgres + file store
-├── cli/                  # projectwiki 命令行
+├── cli/                  # whywiki 命令行
 └── docs/
 ```
 
@@ -421,7 +421,7 @@ Markdown 是渲染结果。
 
 ### 7.1 本次 starter 已包含
 
-随本文档提供的 `projectwiki-codex-starter.zip` 已包含：
+随本文档提供的 `whywiki-codex-starter.zip` 已包含：
 
 - Python package 脚手架
 - SQLite 数据库
@@ -451,9 +451,9 @@ Markdown 是渲染结果。
 
 首板继续开发的优先级：
 
-1. npm-first 本地启动入口：`projectwiki`
+1. npm-first 本地启动入口：`whywiki`
 2. Web UI 工作台
-3. `projectwiki log` 启动日志入口
+3. `whywiki log` 启动日志入口
 4. Parser 稳定性
 5. Fact schema 和 LLM JSON 抽取
 6. 冲突检测规则
@@ -600,60 +600,60 @@ POST   /api/projects/{project_id}/ask
 首板的产品入口不应该要求用户 clone 仓库或理解 Docker。默认入口应该像现代 CLI 产品：
 
 ```bash
-npm install -g projectwiki
-projectwiki
+npm install -g whywiki
+whywiki
 ```
 
-`projectwiki` 静默启动本地 Web 服务，初始化数据目录，选择可用端口，并输出可点击链接：
+`whywiki` 静默启动本地 Web 服务，初始化数据目录，选择可用端口，并输出可点击链接：
 
 ```text
-ProjectWiki is running locally.
+WhyWiki is running locally.
 
 Open:
 http://127.0.0.1:8765
 
 Logs:
-projectwiki log
+whywiki log
 
 Data:
-~/.projectwiki
+~/.whywiki
 ```
 
 必须支持的产品化命令：
 
 ```bash
-projectwiki          # 静默启动本地 Web，并输出 URL
-projectwiki open     # 打开当前 Web UI
-projectwiki status   # 查看运行状态、端口、版本和数据目录
-projectwiki log      # 查看本次或最近一次启动日志
-projectwiki stop     # 停止后台服务
-projectwiki doctor   # 检查端口、运行时和数据目录问题
+whywiki          # 静默启动本地 Web，并输出 URL
+whywiki open     # 打开当前 Web UI
+whywiki status   # 查看运行状态、端口、版本和数据目录
+whywiki log      # 查看本次或最近一次启动日志
+whywiki stop     # 停止后台服务
+whywiki doctor   # 检查端口、运行时和数据目录问题
 ```
 
-`projectwiki log` 是首板可用性的一部分。用户启动失败时不应该被要求理解 uvicorn、Docker、进程 ID 或日志重定向位置。
+`whywiki log` 是首板可用性的一部分。用户启动失败时不应该被要求理解 uvicorn、Docker、进程 ID 或日志重定向位置。
 
 开发者入口保留当前命令：
 
 ```bash
-projectwiki init-db
-projectwiki create "Demo Project"
-projectwiki list
-projectwiki ingest <project_id> ./docs
-projectwiki ingest <project_id> ./repo --source-type git
-projectwiki build <project_id>
-projectwiki ask <project_id> "这个项目当前最新需求是什么？"
-projectwiki serve --port 8080
+whywiki init-db
+whywiki create "Demo Project"
+whywiki list
+whywiki ingest <project_id> ./docs
+whywiki ingest <project_id> ./repo --source-type git
+whywiki build <project_id>
+whywiki ask <project_id> "这个项目当前最新需求是什么？"
+whywiki serve --port 8080
 ```
 
 后续可以演进为：
 
 ```bash
-projectwiki init
-projectwiki add ./docs ./experiments.xlsx ./repo
-projectwiki build
-projectwiki review
-projectwiki export wiki
-projectwiki handover
+whywiki init
+whywiki add ./docs ./experiments.xlsx ./repo
+whywiki build
+whywiki review
+whywiki export wiki
+whywiki handover
 ```
 
 ---
@@ -687,7 +687,7 @@ projectwiki handover
 ### 11.2 Wiki generation prompt 草案
 
 ```text
-你是 AI Project Wiki 维护者。请基于 project facts 生成 Wiki 页面。
+你是 AI WhyWiki 维护者。请基于 project facts 生成 Wiki 页面。
 
 要求：
 1. 每个结论必须带证据。
@@ -743,7 +743,7 @@ Task 7: 做 demo project 和 README
 每个任务结束后运行：
 
 ```bash
-python -m compileall projectwiki
+python -m compileall whywiki
 python -m pytest -q
 ```
 
@@ -759,7 +759,7 @@ Requirements are outdated.
 Code and documents disagree.
 New teammates don't know where to start.
 
-ProjectWiki turns your codebase and scattered docs into an AI-maintained, evidence-backed project wiki.
+WhyWiki turns your codebase and scattered docs into an AI-maintained, evidence-backed project wiki.
 ```
 
 中文：
@@ -767,7 +767,7 @@ ProjectWiki turns your codebase and scattered docs into an AI-maintained, eviden
 ```text
 项目文档混乱、版本不一、代码和需求对不上、新人接手困难？
 
-ProjectWiki 可以把代码仓库、需求文档、会议纪要、实验记录自动整理成一个可追溯、可问答、可交接的 AI 项目 Wiki。
+WhyWiki 可以把代码仓库、需求文档、会议纪要、实验记录自动整理成一个可追溯、可问答、可交接的 AI 项目 Wiki。
 ```
 
 ---
@@ -917,7 +917,7 @@ Demo 展示顺序：
 
 ### 风险 5：启动方式仍然像开发者工具
 
-应对：首板把 `npm install -g projectwiki` 和 `projectwiki` 作为产品入口；Docker、pip、源码 clone 降级为开发者入口。增加 `projectwiki log`，让用户可以直接查看本次启动日志。
+应对：首板把 `npm install -g whywiki` 和 `whywiki` 作为产品入口；Docker、pip、源码 clone 降级为开发者入口。增加 `whywiki log`，让用户可以直接查看本次启动日志。
 
 ### 风险 6：开源传播点不够强
 
@@ -930,8 +930,8 @@ Demo 展示顺序：
 一个陌生用户安装后，可以在 3 分钟内完成：
 
 ```bash
-npm install -g projectwiki
-projectwiki
+npm install -g whywiki
+whywiki
 ```
 
 然后：
@@ -947,7 +947,7 @@ projectwiki
 如果启动失败，用户可以运行：
 
 ```bash
-projectwiki log
+whywiki log
 ```
 
 查看本次或最近一次启动日志。

@@ -9,7 +9,7 @@ SUPPORTED_EXTENSIONS = {
     ".yaml", ".yml", ".json", ".toml", ".ini", ".sh", ".sql"
 }
 
-IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__", ".projectwiki"}
+IGNORE_DIRS = {".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__", ".whywiki"}
 
 
 class LocalFilesConnector:

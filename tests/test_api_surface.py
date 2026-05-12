@@ -2,14 +2,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from projectwiki.app import app
-from projectwiki.services.ingest import ingest_path
-from projectwiki.services.wiki_engine import build_project
-from projectwiki.services.workspace import create_project
+from whywiki.app import app
+from whywiki.services.ingest import ingest_path
+from whywiki.services.wiki_engine import build_project
+from whywiki.services.workspace import create_project
 
 
 def test_dashboard_api_lists_sources_facts_and_blocks(tmp_path, monkeypatch):
-    monkeypatch.setenv("PROJECTWIKI_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(tmp_path / "data"))
     client = TestClient(app)
     project = create_project("Demo")
     root = Path(__file__).resolve().parents[1] / "examples" / "demo-project"

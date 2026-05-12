@@ -5,8 +5,8 @@ from pathlib import Path
 
 
 def get_data_dir() -> Path:
-    """Return the ProjectWiki data directory and create it if missing."""
-    root = Path(os.getenv("PROJECTWIKI_DATA_DIR", ".projectwiki")).expanduser().resolve()
+    """Return the WhyWiki data directory and create it if missing."""
+    root = Path(os.getenv("WHYWIKI_DATA_DIR", ".whywiki")).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     (root / "projects").mkdir(parents=True, exist_ok=True)
     (root / "repos").mkdir(parents=True, exist_ok=True)
@@ -14,7 +14,7 @@ def get_data_dir() -> Path:
 
 
 def get_db_path() -> Path:
-    return get_data_dir() / "projectwiki.db"
+    return get_data_dir() / "whywiki.db"
 
 
 def get_project_dir(project_id: str) -> Path:
