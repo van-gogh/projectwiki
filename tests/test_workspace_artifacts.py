@@ -1,3 +1,5 @@
+import pytest
+
 from whywiki.collaboration.artifacts import (
     WorkspaceArtifactPaths,
     load_workspace_config,
@@ -62,3 +64,59 @@ def test_workspace_paths_do_not_create_code_repo_or_database_files(tmp_path):
 
     assert not (tmp_path / "whywiki.db").exists()
     assert not (tmp_path / "repos").exists()
+
+
+@pytest.mark.parametrize(
+    "project_slug",
+    ["../escape", "../../outside", "{absolute}", "", ".", "..", "demo/escape", "demo\\escape"],
+)
+def test_workspace_project_dir_rejects_unsafe_project_slugs(tmp_path, project_slug):
+    paths = WorkspaceArtifactPaths(tmp_path)
+    absolute_escape = tmp_path.parent / "absolute-escape"
+    slug = str(absolute_escape) if project_slug == "{absolute}" else project_slug
+
+    with pytest.raises(ValueError):
+        workspace_project_dir(paths, slug)
+
+    assert not (tmp_path / "escape").exists()
+    assert not (tmp_path.parent / "outside").exists()
+    assert not absolute_escape.exists()
+
+
+def test_save_workspace_config_rejects_unsafe_project_slugs(tmp_path):
+    paths = WorkspaceArtifactPaths(tmp_path)
+    config = WorkspaceConfig(
+        workspace=RepoRef(provider="github", repo="owner/whywiki-memory"),
+        projects={
+            "../escape": [
+                LinkedRepo(
+                    id="backend",
+                    repo=RepoRef(provider="gitea", repo="team/backend", base_url="https://git.example.test"),
+                )
+            ]
+        },
+    )
+
+    with pytest.raises(ValueError):
+        save_workspace_config(paths, config)
+
+    assert not (tmp_path / "escape").exists()
+
+
+def test_save_review_event_rejects_unsafe_project_slugs(tmp_path):
+    paths = WorkspaceArtifactPaths(tmp_path)
+    actor = ProviderIdentity(provider="github", account="alice", provider_user_id="1")
+    event = ReviewEvent(
+        id="rev_1",
+        project_slug="../../outside",
+        subject_type="conflict",
+        subject_id="conf_1",
+        action="resolve",
+        actor=actor,
+        created_at="2026-05-12T00:00:00Z",
+    )
+
+    with pytest.raises(ValueError):
+        save_review_event(paths, event)
+
+    assert not (tmp_path.parent / "outside").exists()
