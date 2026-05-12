@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal, cast
+from types import MappingProxyType
+from typing import Any, Literal, Mapping, Sequence, cast
+from urllib.parse import urlparse
 
 ProviderName = Literal["github", "gitea"]
 ReviewAction = Literal["approve", "reject", "resolve", "ignore", "note"]
@@ -19,17 +21,22 @@ def _normalize_provider(provider: str) -> ProviderName:
     return cast(ProviderName, provider)
 
 
-def _normalize_base_url(base_url: str | None) -> str | None:
+def _normalize_base_url(provider: ProviderName, base_url: str | None) -> str | None:
+    if provider == "github":
+        return None
     if base_url is None:
         return None
     value = base_url.strip().rstrip("/")
-    return value or None
+    parsed = urlparse(value)
+    if not value or parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("gitea base_url must be an http(s) URL with a host")
+    return value
 
 
 def _normalize_repo(repo: str) -> str:
     value = repo.strip()
     parts = value.split("/")
-    if len(parts) != 2 or not all(parts):
+    if len(parts) != 2 or not all(parts) or any(any(char.isspace() for char in part) for part in parts):
         raise ValueError("repo must be in owner/name form")
     return value
 
@@ -42,18 +49,21 @@ def _provider_key(provider: ProviderName, base_url: str | None) -> str:
     return f"gitea:{base_url}"
 
 
-@dataclass
+@dataclass(frozen=True)
 class RepoRef:
     provider: ProviderName
     repo: str
     base_url: str | None = None
 
     def __post_init__(self) -> None:
-        self.provider = _normalize_provider(self.provider)
-        self.repo = _normalize_repo(self.repo)
-        self.base_url = _normalize_base_url(self.base_url)
-        if self.provider == "gitea" and self.base_url is None:
+        provider = _normalize_provider(self.provider)
+        repo = _normalize_repo(self.repo)
+        base_url = _normalize_base_url(provider, self.base_url)
+        if provider == "gitea" and base_url is None:
             raise ValueError("gitea repo references require base_url")
+        object.__setattr__(self, "provider", provider)
+        object.__setattr__(self, "repo", repo)
+        object.__setattr__(self, "base_url", base_url)
 
     @property
     def provider_key(self) -> str:
@@ -83,7 +93,7 @@ class RepoRef:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class LinkedRepo:
     id: str
     repo: RepoRef
@@ -108,7 +118,7 @@ class LinkedRepo:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class ProviderIdentity:
     provider: ProviderName
     account: str
@@ -116,10 +126,12 @@ class ProviderIdentity:
     base_url: str | None = None
 
     def __post_init__(self) -> None:
-        self.provider = _normalize_provider(self.provider)
-        self.base_url = _normalize_base_url(self.base_url)
-        if self.provider == "gitea" and self.base_url is None:
+        provider = _normalize_provider(self.provider)
+        base_url = _normalize_base_url(provider, self.base_url)
+        if provider == "gitea" and base_url is None:
             raise ValueError("gitea identities require base_url")
+        object.__setattr__(self, "provider", provider)
+        object.__setattr__(self, "base_url", base_url)
 
     @property
     def provider_key(self) -> str:
@@ -145,7 +157,7 @@ class ProviderIdentity:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class RepoPermission:
     repo_key: str
     can_read: bool
@@ -163,10 +175,13 @@ class RepoPermission:
         return payload
 
 
-@dataclass
+@dataclass(frozen=True)
 class WorkspaceAccessReport:
     workspace: RepoPermission
-    linked_repos: list[RepoPermission] = field(default_factory=list)
+    linked_repos: Sequence[RepoPermission] = field(default_factory=tuple)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "linked_repos", tuple(self.linked_repos))
 
     @property
     def missing_required_linked_repo_access(self) -> list[RepoPermission]:
@@ -174,11 +189,15 @@ class WorkspaceAccessReport:
 
     @property
     def can_enter_workspace(self) -> bool:
-        return self.workspace.can_read and not self.missing_required_linked_repo_access
+        return self.workspace.can_read
 
     @property
     def can_review(self) -> bool:
-        return self.can_enter_workspace and self.workspace.can_write
+        return self.workspace.can_read and self.workspace.can_write
+
+    @property
+    def can_view_project_memory(self) -> bool:
+        return self.can_enter_workspace and not self.missing_required_linked_repo_access
 
     def to_dict(self) -> dict[str, Any]:
         missing = self.missing_required_linked_repo_access
@@ -187,14 +206,19 @@ class WorkspaceAccessReport:
             "linked_repos": [permission.to_dict() for permission in self.linked_repos],
             "can_enter_workspace": self.can_enter_workspace,
             "can_review": self.can_review,
+            "can_view_project_memory": self.can_view_project_memory,
             "missing_required_linked_repo_access": [permission.to_dict() for permission in missing],
         }
 
 
-@dataclass
+@dataclass(frozen=True)
 class WorkspaceConfig:
     workspace: RepoRef
-    projects: dict[str, list[LinkedRepo]] = field(default_factory=dict)
+    projects: Mapping[str, Sequence[LinkedRepo]] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        projects = MappingProxyType({slug: tuple(linked_repos) for slug, linked_repos in self.projects.items()})
+        object.__setattr__(self, "projects", projects)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -219,7 +243,7 @@ class WorkspaceConfig:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class EvidencePointer:
     provider: ProviderName
     repo: str
@@ -234,11 +258,14 @@ class EvidencePointer:
     block_id: str | None = None
 
     def __post_init__(self) -> None:
-        self.provider = _normalize_provider(self.provider)
-        self.repo = _normalize_repo(self.repo)
-        self.base_url = _normalize_base_url(self.base_url)
-        if self.provider == "gitea" and self.base_url is None:
+        provider = _normalize_provider(self.provider)
+        repo = _normalize_repo(self.repo)
+        base_url = _normalize_base_url(provider, self.base_url)
+        if provider == "gitea" and base_url is None:
             raise ValueError("gitea evidence pointers require base_url")
+        object.__setattr__(self, "provider", provider)
+        object.__setattr__(self, "repo", repo)
+        object.__setattr__(self, "base_url", base_url)
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -263,7 +290,7 @@ class EvidencePointer:
         return payload
 
 
-@dataclass
+@dataclass(frozen=True)
 class ReviewEvent:
     id: str
     project_slug: str
@@ -277,10 +304,10 @@ class ReviewEvent:
     def __post_init__(self) -> None:
         if self.subject_type not in _REVIEW_SUBJECT_TYPES:
             raise ValueError("subject_type must be 'fact' or 'conflict'")
-        self.subject_type = cast(ReviewSubjectType, self.subject_type)
         if self.action not in _REVIEW_ACTIONS:
             raise ValueError("action must be one of approve, reject, resolve, ignore, note")
-        self.action = cast(ReviewAction, self.action)
+        object.__setattr__(self, "subject_type", cast(ReviewSubjectType, self.subject_type))
+        object.__setattr__(self, "action", cast(ReviewAction, self.action))
 
     def to_dict(self) -> dict[str, Any]:
         created_at = self.created_at.isoformat() if isinstance(self.created_at, datetime) else self.created_at
