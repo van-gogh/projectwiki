@@ -101,18 +101,26 @@ class LinkedRepo:
     required: bool = True
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "id": self.id,
-            "repo": self.repo.to_dict(),
+            "provider": self.repo.provider,
+            "repo": self.repo.repo,
             "branch": self.branch,
             "required": self.required,
         }
+        if self.repo.base_url is not None:
+            payload["base_url"] = self.repo.base_url
+        return payload
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> LinkedRepo:
         return cls(
             id=payload["id"],
-            repo=RepoRef.from_dict(payload["repo"]),
+            repo=RepoRef(
+                provider=payload["provider"],
+                repo=payload["repo"],
+                base_url=payload.get("base_url"),
+            ),
             branch=payload.get("branch", "main"),
             required=payload.get("required", True),
         )
@@ -184,8 +192,12 @@ class WorkspaceAccessReport:
         object.__setattr__(self, "linked_repos", tuple(self.linked_repos))
 
     @property
-    def missing_required_linked_repo_access(self) -> list[RepoPermission]:
+    def missing_required_linked_repo_permissions(self) -> list[RepoPermission]:
         return [permission for permission in self.linked_repos if not permission.can_read]
+
+    @property
+    def missing_required_linked_repo_access(self) -> bool:
+        return bool(self.missing_required_linked_repo_permissions)
 
     @property
     def can_enter_workspace(self) -> bool:
@@ -200,14 +212,17 @@ class WorkspaceAccessReport:
         return self.can_enter_workspace and not self.missing_required_linked_repo_access
 
     def to_dict(self) -> dict[str, Any]:
-        missing = self.missing_required_linked_repo_access
+        missing_permissions = self.missing_required_linked_repo_permissions
         return {
             "workspace": self.workspace.to_dict(),
             "linked_repos": [permission.to_dict() for permission in self.linked_repos],
             "can_enter_workspace": self.can_enter_workspace,
             "can_review": self.can_review,
             "can_view_project_memory": self.can_view_project_memory,
-            "missing_required_linked_repo_access": [permission.to_dict() for permission in missing],
+            "missing_required_linked_repo_access": self.missing_required_linked_repo_access,
+            "missing_required_linked_repo_permissions": [
+                permission.to_dict() for permission in missing_permissions
+            ],
         }
 
 

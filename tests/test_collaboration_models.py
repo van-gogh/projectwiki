@@ -92,9 +92,42 @@ def test_workspace_config_round_trip():
     payload = config.to_dict()
     restored = WorkspaceConfig.from_dict(payload)
 
+    assert payload["projects"]["demo"]["linked_repos"] == [
+        {
+            "id": "backend",
+            "provider": "gitea",
+            "repo": "team/backend",
+            "base_url": "https://git.example.test",
+            "branch": "main",
+            "required": True,
+        }
+    ]
     assert restored.workspace.repo == "owner/whywiki-memory"
     assert restored.projects["demo"][0].id == "backend"
     assert restored.projects["demo"][0].required is True
+
+
+def test_linked_repo_uses_flat_serialization_shape():
+    linked_repo = LinkedRepo(
+        id="backend",
+        repo=RepoRef(provider="gitea", repo="team/backend", base_url="https://git.example.test/"),
+    )
+
+    payload = linked_repo.to_dict()
+    restored = LinkedRepo.from_dict(payload)
+
+    assert payload == {
+        "id": "backend",
+        "provider": "gitea",
+        "repo": "team/backend",
+        "base_url": "https://git.example.test",
+        "branch": "main",
+        "required": True,
+    }
+    assert restored.id == "backend"
+    assert restored.repo.key == "gitea:https://git.example.test:team/backend"
+    assert restored.branch == "main"
+    assert restored.required is True
 
 
 def test_workspace_config_from_dict_keeps_indexable_shape():
@@ -106,11 +139,9 @@ def test_workspace_config_from_dict_keeps_indexable_shape():
                     "linked_repos": [
                         {
                             "id": "backend",
-                            "repo": {
-                                "provider": "gitea",
-                                "repo": "team/backend",
-                                "base_url": "https://git.example.test/",
-                            },
+                            "provider": "gitea",
+                            "repo": "team/backend",
+                            "base_url": "https://git.example.test/",
                         }
                     ]
                 }
@@ -119,7 +150,7 @@ def test_workspace_config_from_dict_keeps_indexable_shape():
     )
 
     assert config.projects["demo"][0].branch == "main"
-    assert config.to_dict()["projects"]["demo"]["linked_repos"][0]["repo"]["base_url"] == "https://git.example.test"
+    assert config.to_dict()["projects"]["demo"]["linked_repos"][0]["base_url"] == "https://git.example.test"
 
 
 def test_repo_permission_and_identity_shapes():
@@ -134,6 +165,25 @@ def test_repo_permission_and_identity_shapes():
     assert identity.provider_key == "gitea:https://git.example.test"
     assert permission.can_read is True
     assert permission.can_write is False
+
+
+def test_provider_identity_from_dict_round_trip():
+    restored = ProviderIdentity.from_dict(
+        {
+            "provider": "gitea",
+            "account": "alice",
+            "provider_user_id": "42",
+            "base_url": "https://git.example.test/",
+        }
+    )
+
+    assert restored.to_dict() == {
+        "provider": "gitea",
+        "account": "alice",
+        "provider_user_id": "42",
+        "base_url": "https://git.example.test",
+    }
+    assert restored.provider_key == "gitea:https://git.example.test"
 
 
 def test_provider_identity_rejects_invalid_gitea_base_url():
@@ -157,10 +207,12 @@ def test_workspace_access_report_separates_workspace_and_linked_repo_permissions
     assert report.can_enter_workspace is True
     assert report.can_review is True
     assert report.can_view_project_memory is False
-    assert report.missing_required_linked_repo_access[0].repo_key == "gitea:https://git.example.test:team/backend"
+    assert report.missing_required_linked_repo_access is True
+    assert report.missing_required_linked_repo_permissions[0].repo_key == "gitea:https://git.example.test:team/backend"
     assert report.to_dict()["can_enter_workspace"] is True
     assert report.to_dict()["can_review"] is True
     assert report.to_dict()["can_view_project_memory"] is False
+    assert report.to_dict()["missing_required_linked_repo_access"] is True
 
 
 def test_workspace_access_report_requires_workspace_write_for_review():
@@ -175,6 +227,7 @@ def test_workspace_access_report_requires_workspace_write_for_review():
     assert read_only_report.can_review is False
     assert write_without_read_report.can_enter_workspace is False
     assert write_without_read_report.can_review is False
+    assert write_without_read_report.missing_required_linked_repo_access is False
 
 
 def test_evidence_pointer_has_provider_location():
@@ -192,6 +245,25 @@ def test_evidence_pointer_has_provider_location():
 
     assert pointer.to_dict()["provider"] == "github"
     assert pointer.to_dict()["line_start"] == 3
+
+
+def test_evidence_pointer_omits_optional_none_fields():
+    payload = EvidencePointer(
+        provider="github",
+        repo="owner/project",
+        commit="abc123",
+        path="src/app.py",
+    ).to_dict()
+
+    assert payload == {
+        "provider": "github",
+        "repo": "owner/project",
+        "commit": "abc123",
+        "path": "src/app.py",
+    }
+    assert "base_url" not in payload
+    assert "ref" not in payload
+    assert "line_start" not in payload
 
 
 def test_review_event_to_dict_shape():
