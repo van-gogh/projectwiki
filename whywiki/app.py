@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
@@ -101,13 +101,22 @@ def workspace_paths() -> WorkspaceArtifactPaths:
 
 
 def provider_registry():
+    identities = account_store().list_identities()
     try:
         return provider_registry_from_accounts(
-            account_store().list_identities(),
+            identities,
             default_token_store(),
             os.environ,
         )
-    except TokenStoreUnavailable:
+    except TokenStoreUnavailable as exc:
+        if identities:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Token storage is unavailable for connected provider accounts: {exc}. "
+                    "Enable keyring or set WHYWIKI_ALLOW_FILE_TOKEN_STORE=1."
+                ),
+            ) from exc
         return static_provider_registry_from_env()
 
 
@@ -128,6 +137,14 @@ def workspace_status_payload(project_slug: str | None = None) -> dict:
     config = load_workspace_config(paths)
     report = CollaborationService(config, provider_registry()).check_workspace(project_slug)
     return {"configured": True, **config.to_dict(), "access": report.to_dict()}
+
+
+def validate_gitea_base_url(base_url: str) -> str:
+    value = base_url.strip().rstrip("/")
+    parsed = urlparse(value)
+    if not value or parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="base_url must be an http(s) URL with a host.")
+    return value
 
 
 def require_workspace_read_if_configured(project_slug: str | None = None) -> None:
@@ -232,6 +249,7 @@ def api_gitea_start(req: GiteaStartRequest) -> dict:
         raise HTTPException(status_code=400, detail="base_url is required for Gitea login.")
     if not client_id:
         raise HTTPException(status_code=400, detail="client_id is required for Gitea login.")
+    base_url = validate_gitea_base_url(base_url)
 
     redirect_uri = "http://127.0.0.1:8765/api/auth/gitea/callback"
     result = GiteaOAuthClient(base_url, client_id, redirect_uri).start()
@@ -272,10 +290,16 @@ def api_gitea_callback(
         session["client_id"],
         session["redirect_uri"],
     )
-    token = client.exchange_code(code, session["code_verifier"])
-    identity = GiteaProviderClient(session["base_url"], token.access_token).authenticated_identity()
-    require_token_store().save(identity, token)
-    account_store().save_identity(identity)
+    try:
+        token = client.exchange_code(code, session["code_verifier"])
+        identity = GiteaProviderClient(session["base_url"], token.access_token).authenticated_identity()
+        require_token_store().save(identity, token)
+        account_store().save_identity(identity)
+    except Exception:
+        return _gitea_auth_failure(
+            "Gitea login failed.",
+            "WhyWiki could not complete provider authorization. Please check token storage and Gitea OAuth settings, then start login again.",
+        )
     return HTMLResponse("<html><body><h1>Gitea connected</h1><p>You can return to WhyWiki.</p></body></html>")
 
 

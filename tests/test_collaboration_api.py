@@ -136,6 +136,24 @@ def test_workspace_status_uses_stored_provider_token(tmp_path, monkeypatch):
     assert status.json()["access"]["can_review"] is True
 
 
+def test_workspace_status_reports_token_store_unavailable_for_connected_account(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(data_dir))
+    identity = ProviderIdentity(provider="github", account="alice", provider_user_id="1")
+    AccountStore(data_dir / "auth" / "accounts.json").save_identity(identity)
+    client = TestClient(app)
+
+    create = client.post(
+        "/api/workspace/connect",
+        json={"provider": "github", "repo": "owner/whywiki-memory"},
+    )
+    status = client.get("/api/workspace/status")
+
+    assert create.status_code == 200
+    assert status.status_code == 503
+    assert "token storage" in status.json()["detail"].lower()
+
+
 def test_workspace_status_reports_project_linked_repo_access(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     monkeypatch.setenv("WHYWIKI_DATA_DIR", str(data_dir))

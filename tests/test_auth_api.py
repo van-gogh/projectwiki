@@ -200,6 +200,16 @@ def test_gitea_start_requires_base_url_and_client_id():
     assert "client_id" in missing_client_id.json()["detail"]
 
 
+def test_gitea_start_rejects_non_http_base_url():
+    response = _client().post(
+        "/api/auth/gitea/start",
+        json={"base_url": "ftp://git.example.test", "client_id": "gitea-client"},
+    )
+
+    assert response.status_code == 400
+    assert "http(s)" in response.json()["detail"]
+
+
 def test_gitea_start_stores_session_and_returns_authorization_url_without_token(monkeypatch):
     def fake_start(self):
         return {
@@ -286,6 +296,31 @@ def test_gitea_callback_success_saves_identity_and_token(tmp_path, monkeypatch):
     assert "gitea-secret" not in response.text
     assert AccountStore(tmp_path / "data" / "auth" / "accounts.json").list_identities() == [identity]
     assert _token_store(tmp_path).load(identity).access_token == "gitea-secret"
+
+
+def test_gitea_callback_provider_failure_returns_html_without_saving_account(tmp_path, monkeypatch):
+    app_module.auth_sessions.save(
+        "state-123",
+        {
+            "base_url": "https://git.example.test",
+            "client_id": "gitea-client",
+            "redirect_uri": "http://127.0.0.1:8765/api/auth/gitea/callback",
+            "code_verifier": "verifier",
+        },
+    )
+
+    def fail_exchange_code(self, code, code_verifier):
+        raise RuntimeError("provider returned malformed token response")
+
+    monkeypatch.setattr(app_module.GiteaOAuthClient, "exchange_code", fail_exchange_code)
+
+    response = _client().get("/api/auth/gitea/callback?code=code-123&state=state-123")
+
+    assert response.status_code == 400
+    assert response.headers["content-type"].startswith("text/html")
+    assert "gitea login failed" in response.text.lower()
+    assert "provider returned malformed" not in response.text
+    assert AccountStore(tmp_path / "data" / "auth" / "accounts.json").list_identities() == []
 
 
 def test_delete_account_removes_identity_and_token(tmp_path, monkeypatch):
