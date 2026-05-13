@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -6,6 +8,20 @@ from whywiki.app import app
 from whywiki.collaboration.accounts import AccountStore
 from whywiki.collaboration.models import ProviderIdentity
 from whywiki.collaboration.tokens import FileTokenStore, KeyringTokenStore, ProviderToken
+
+
+class _FakeHTTPResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+
+    def __enter__(self) -> "_FakeHTTPResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(self._payload).encode("utf-8")
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +48,40 @@ def test_github_device_start_requires_client_id_env():
 
     assert response.status_code == 400
     assert "WHYWIKI_GITHUB_CLIENT_ID" in response.json()["detail"]
+
+
+def test_github_device_start_returns_device_codes_and_poll_interval(monkeypatch):
+    captured_requests = []
+    monkeypatch.setenv("WHYWIKI_GITHUB_CLIENT_ID", "github-client")
+
+    def fake_urlopen(request, timeout):
+        captured_requests.append(request)
+        return _FakeHTTPResponse(
+            {
+                "device_code": "device-123",
+                "user_code": "ABCD-EFGH",
+                "verification_uri": "https://github.com/login/device",
+                "expires_in": 900,
+                "interval": 7,
+            }
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    response = _client().post("/api/auth/github/device/start")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "waiting_for_user",
+        "provider": "github",
+        "device_code": "device-123",
+        "user_code": "ABCD-EFGH",
+        "verification_uri": "https://github.com/login/device",
+        "expires_in": 900,
+        "interval": 7,
+        "poll_after_seconds": 7,
+    }
+    assert captured_requests[0].full_url == "https://github.com/login/device/code"
 
 
 def test_github_device_poll_authorized_saves_identity_and_token_without_returning_token(
@@ -72,6 +122,35 @@ def test_github_device_poll_authorized_saves_identity_and_token_without_returnin
     assert "secret-token" not in response.text
     assert AccountStore(tmp_path / "data" / "auth" / "accounts.json").list_identities() == [identity]
     assert _token_store(tmp_path).load(identity).access_token == "secret-token"
+
+
+def test_github_device_poll_authorized_returns_503_when_token_store_unavailable(monkeypatch):
+    monkeypatch.setenv("WHYWIKI_GITHUB_CLIENT_ID", "github-client")
+    identity = ProviderIdentity(provider="github", account="alice", provider_user_id="42")
+
+    monkeypatch.setattr(
+        app_module.GitHubDeviceFlowClient,
+        "poll",
+        lambda self, device_code, current_interval=5: {
+            "status": "authorized",
+            "provider": "github",
+            "token": ProviderToken(access_token="secret-token", scope="repo"),
+        },
+    )
+    monkeypatch.setattr(
+        app_module.GitHubProviderClient,
+        "authenticated_identity",
+        lambda self: identity,
+    )
+
+    response = _client().post(
+        "/api/auth/github/device/poll",
+        json={"device_code": "device-123"},
+    )
+
+    assert response.status_code == 503
+    assert "token storage" in response.json()["detail"].lower()
+    assert AccountStore(app_module.get_data_dir() / "auth" / "accounts.json").list_identities() == []
 
 
 def test_github_device_poll_pending_passes_through_without_saving_account_or_token(
@@ -149,11 +228,25 @@ def test_gitea_start_stores_session_and_returns_authorization_url_without_token(
     assert app_module.auth_sessions.pop("state-123") == {"state": "state-123", "code_verifier": "verifier"}
 
 
-def test_gitea_callback_invalid_state_returns_400():
+def test_gitea_callback_missing_code_or_state_returns_html_400():
+    missing_code = _client().get("/api/auth/gitea/callback?state=state-123")
+    missing_state = _client().get("/api/auth/gitea/callback?code=code-123")
+
+    assert missing_code.status_code == 400
+    assert missing_code.headers["content-type"].startswith("text/html")
+    assert "authorization was not completed" in missing_code.text.lower()
+    assert missing_state.status_code == 400
+    assert missing_state.headers["content-type"].startswith("text/html")
+    assert "authorization was not completed" in missing_state.text.lower()
+
+
+def test_gitea_callback_invalid_state_returns_html_400():
     response = _client().get("/api/auth/gitea/callback?code=code-123&state=missing")
 
     assert response.status_code == 400
-    assert "state" in response.json()["detail"]
+    assert response.headers["content-type"].startswith("text/html")
+    assert "session expired" in response.text.lower()
+    assert "start gitea login again" in response.text.lower()
 
 
 def test_gitea_callback_success_saves_identity_and_token(tmp_path, monkeypatch):
@@ -207,6 +300,25 @@ def test_delete_account_removes_identity_and_token(tmp_path, monkeypatch):
     assert response.json() == {"deleted": True}
     assert AccountStore(tmp_path / "data" / "auth" / "accounts.json").list_identities() == []
     assert _token_store(tmp_path).load(identity) is None
+
+
+def test_delete_account_preserves_identity_when_token_store_is_unavailable(tmp_path):
+    identity = ProviderIdentity(provider="github", account="alice", provider_user_id="42")
+    store = AccountStore(tmp_path / "data" / "auth" / "accounts.json")
+    store.save_identity(identity)
+
+    response = _client().delete("/api/auth/accounts/github%3A42")
+
+    assert response.status_code == 503
+    assert "token storage" in response.json()["detail"].lower()
+    assert store.list_identities() == [identity]
+
+
+def test_delete_missing_account_does_not_require_token_store():
+    response = _client().delete("/api/auth/accounts/github%3A404")
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted": False}
 
 
 def test_auth_accounts_returns_only_metadata(tmp_path, monkeypatch):

@@ -83,7 +83,10 @@ def require_token_store():
     try:
         return default_token_store()
     except TokenStoreUnavailable as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=503,
+            detail=f"Token storage is unavailable: {exc}. Enable keyring or set WHYWIKI_ALLOW_FILE_TOKEN_STORE=1.",
+        ) from exc
 
 
 def github_client_id() -> str:
@@ -191,15 +194,18 @@ def api_delete_auth_account(identity_key: str) -> dict:
         ),
         None,
     )
-    deleted = store.delete_identity(decoded_identity_key)
-    if identity is not None:
-        require_token_store().delete(identity)
-    return {"deleted": deleted}
+    if identity is None:
+        return {"deleted": False}
+
+    require_token_store().delete(identity)
+    return {"deleted": store.delete_identity(decoded_identity_key)}
 
 
 @app.post("/api/auth/github/device/start")
 def api_github_device_start() -> dict:
-    return GitHubDeviceFlowClient(github_client_id()).start()
+    result = GitHubDeviceFlowClient(github_client_id()).start()
+    result.setdefault("interval", result.get("poll_after_seconds", 5))
+    return result
 
 
 @app.post("/api/auth/github/device/poll")
@@ -243,15 +249,23 @@ def api_gitea_callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
-) -> str:
+) -> HTMLResponse:
     if error:
-        return "<html><body><h1>Gitea login failed</h1><p>Authorization was not completed.</p></body></html>"
+        return HTMLResponse(
+            "<html><body><h1>Gitea login failed</h1><p>Authorization was not completed.</p></body></html>"
+        )
     if not code or not state:
-        raise HTTPException(status_code=400, detail="Gitea callback requires code and state.")
+        return _gitea_auth_failure(
+            "Gitea authorization was not completed.",
+            "Please start Gitea login again from WhyWiki.",
+        )
 
     session = auth_sessions.pop(state)
     if session is None:
-        raise HTTPException(status_code=400, detail="Gitea login state is missing or expired.")
+        return _gitea_auth_failure(
+            "Gitea login session expired.",
+            "Please start Gitea login again from WhyWiki.",
+        )
 
     client = GiteaOAuthClient(
         session["base_url"],
@@ -262,7 +276,14 @@ def api_gitea_callback(
     identity = GiteaProviderClient(session["base_url"], token.access_token).authenticated_identity()
     require_token_store().save(identity, token)
     account_store().save_identity(identity)
-    return "<html><body><h1>Gitea connected</h1><p>You can return to WhyWiki.</p></body></html>"
+    return HTMLResponse("<html><body><h1>Gitea connected</h1><p>You can return to WhyWiki.</p></body></html>")
+
+
+def _gitea_auth_failure(title: str, guidance: str) -> HTMLResponse:
+    return HTMLResponse(
+        f"<html><body><h1>{title}</h1><p>{guidance}</p></body></html>",
+        status_code=400,
+    )
 
 
 @app.post("/api/workspace/connect")
