@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import unquote
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
@@ -16,6 +17,8 @@ from .collaboration.artifacts import (
 )
 from .collaboration.env import static_provider_registry_from_env
 from .collaboration.models import RepoRef, WorkspaceConfig
+from .collaboration.oauth import AuthSessionStore, GitHubDeviceFlowClient, GiteaOAuthClient
+from .collaboration.providers import GitHubProviderClient, GiteaProviderClient
 from .collaboration.registry import provider_registry_from_accounts
 from .collaboration.tokens import TokenStoreUnavailable, default_token_store
 from .config import get_data_dir
@@ -31,6 +34,7 @@ from .services.workspace import create_project, get_project, list_projects
 app = FastAPI(title="WhyWiki", version="0.1.0")
 static_dir = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+auth_sessions = AuthSessionStore()
 
 
 class CreateProjectRequest(BaseModel):
@@ -61,8 +65,32 @@ class ConnectWorkspaceRequest(BaseModel):
     base_url: str | None = None
 
 
+class GitHubDevicePollRequest(BaseModel):
+    device_code: str
+    current_interval: float = 5
+
+
+class GiteaStartRequest(BaseModel):
+    base_url: str
+    client_id: str
+
+
 def account_store() -> AccountStore:
     return AccountStore(get_data_dir() / "auth" / "accounts.json")
+
+
+def require_token_store():
+    try:
+        return default_token_store()
+    except TokenStoreUnavailable as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def github_client_id() -> str:
+    value = os.getenv("WHYWIKI_GITHUB_CLIENT_ID", "").strip()
+    if not value:
+        raise HTTPException(status_code=400, detail="Missing WHYWIKI_GITHUB_CLIENT_ID for GitHub login.")
+    return value
 
 
 def workspace_paths() -> WorkspaceArtifactPaths:
@@ -149,6 +177,92 @@ def api_auth_accounts() -> dict:
             for identity in account_store().list_identities()
         ]
     }
+
+
+@app.delete("/api/auth/accounts/{identity_key:path}")
+def api_delete_auth_account(identity_key: str) -> dict:
+    decoded_identity_key = unquote(identity_key)
+    store = account_store()
+    identity = next(
+        (
+            stored_identity
+            for stored_identity in store.list_identities()
+            if stored_identity.identity_key == decoded_identity_key
+        ),
+        None,
+    )
+    deleted = store.delete_identity(decoded_identity_key)
+    if identity is not None:
+        require_token_store().delete(identity)
+    return {"deleted": deleted}
+
+
+@app.post("/api/auth/github/device/start")
+def api_github_device_start() -> dict:
+    return GitHubDeviceFlowClient(github_client_id()).start()
+
+
+@app.post("/api/auth/github/device/poll")
+def api_github_device_poll(req: GitHubDevicePollRequest) -> dict:
+    result = GitHubDeviceFlowClient(github_client_id()).poll(
+        req.device_code,
+        current_interval=req.current_interval,
+    )
+    if result.get("status") != "authorized":
+        return result
+
+    token = result["token"]
+    identity = GitHubProviderClient(token.access_token).authenticated_identity()
+    require_token_store().save(identity, token)
+    account_store().save_identity(identity)
+    return {"status": "connected", "provider": "github", "identity": identity.to_dict()}
+
+
+@app.post("/api/auth/gitea/start")
+def api_gitea_start(req: GiteaStartRequest) -> dict:
+    base_url = req.base_url.strip()
+    client_id = req.client_id.strip()
+    if not base_url:
+        raise HTTPException(status_code=400, detail="base_url is required for Gitea login.")
+    if not client_id:
+        raise HTTPException(status_code=400, detail="client_id is required for Gitea login.")
+
+    redirect_uri = "http://127.0.0.1:8765/api/auth/gitea/callback"
+    result = GiteaOAuthClient(base_url, client_id, redirect_uri).start()
+    auth_sessions.save(result["state"], result["session"])
+    return {
+        "status": result["status"],
+        "provider": result["provider"],
+        "authorization_url": result["authorization_url"],
+        "state": result["state"],
+    }
+
+
+@app.get("/api/auth/gitea/callback", response_class=HTMLResponse)
+def api_gitea_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+) -> str:
+    if error:
+        return "<html><body><h1>Gitea login failed</h1><p>Authorization was not completed.</p></body></html>"
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Gitea callback requires code and state.")
+
+    session = auth_sessions.pop(state)
+    if session is None:
+        raise HTTPException(status_code=400, detail="Gitea login state is missing or expired.")
+
+    client = GiteaOAuthClient(
+        session["base_url"],
+        session["client_id"],
+        session["redirect_uri"],
+    )
+    token = client.exchange_code(code, session["code_verifier"])
+    identity = GiteaProviderClient(session["base_url"], token.access_token).authenticated_identity()
+    require_token_store().save(identity, token)
+    account_store().save_identity(identity)
+    return "<html><body><h1>Gitea connected</h1><p>You can return to WhyWiki.</p></body></html>"
 
 
 @app.post("/api/workspace/connect")
