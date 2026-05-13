@@ -149,22 +149,23 @@ def test_sidebar_exposes_collaboration_status_targets():
     assert 'id="linkedRepoStatus"' in content
 
 
-def test_login_provider_placeholders_are_disabled():
+def test_login_provider_buttons_are_real_actions():
     html = (STATIC / "index.html").read_text(encoding="utf-8")
-    css = (STATIC / "styles.css").read_text(encoding="utf-8")
 
     for button_id in ("loginGithubButton", "loginGiteaButton"):
-        pattern = rf'<button[^>]*id="{button_id}"[^>]*disabled[^>]*aria-disabled="true"'
-        assert re.search(pattern, html), f"{button_id} must be visibly disabled until OAuth exists"
-    assert ".secondary-action:disabled" in css
-    assert '[aria-disabled="true"]' in css
+        pattern = rf'<button(?P<tag>[^>]*)id="{button_id}"(?P<tag_after>[^>]*)>'
+        match = re.search(pattern, html)
+        assert match, f"Missing {button_id}"
+        tag = f'{match.group("tag")} {match.group("tag_after")}'
+        assert "disabled" not in tag
+    assert 'id="authConnectionPanel"' in html
 
 
 def test_i18n_includes_git_provider_collaboration_copy():
     content = (STATIC / "i18n.js").read_text(encoding="utf-8")
 
-    assert "Login with GitHub" in content
-    assert "Login with Gitea" in content
+    assert "Connect GitHub account" in content
+    assert "Connect Gitea account" in content
     assert "No workspace access" in content
     assert "Workspace read-only" in content
     assert "缺少代码仓库访问权限" in content
@@ -178,6 +179,29 @@ def test_app_js_fetches_collaboration_status_endpoints():
     assert "workspaceStatusPath" in content
     assert "project_slug=" in content
     assert "encodeURIComponent(currentProjectId)" in content
+
+
+def test_app_js_contains_real_auth_flow_hooks():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "startGithubLogin" in content
+    assert "/api/auth/github/device/start" in content
+    assert "/api/auth/github/device/poll" in content
+    assert "startGiteaLogin" in content
+    assert "/api/auth/gitea/start" in content
+    assert "disconnectAccount" in content
+    assert "renderAuthConnectionPanel" in content
+
+
+def test_i18n_contains_real_auth_states():
+    content = (STATIC / "i18n.js").read_text(encoding="utf-8")
+
+    assert "Connect GitHub account" in content
+    assert "Connect Gitea account" in content
+    assert "Waiting for authorization" in content
+    assert "Token storage unavailable" in content
+    assert "打开 GitHub 授权" in content
+    assert "令牌存储不可用" in content
 
 
 def test_app_js_renders_workspace_access_report():

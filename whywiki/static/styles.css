@@ -195,6 +195,139 @@ body.has-current-project .project-pill {
   color: #b45309;
 }
 
+.auth-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.auth-message,
+.auth-flow {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 8px;
+  line-height: 1.35;
+}
+
+.auth-message p,
+.auth-flow p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.auth-message-loading {
+  border-color: #bfdbfe;
+  background: var(--info-bg);
+}
+
+.auth-message-success {
+  border-color: #bbf7d0;
+  background: var(--ok-bg);
+  color: #047857;
+}
+
+.auth-message-error {
+  border-color: #fecaca;
+  background: var(--danger-bg);
+  color: #991b1b;
+}
+
+.auth-code {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfbfc;
+  color: var(--text);
+  padding: 7px 8px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.auth-form {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.auth-form input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfbfc;
+  color: var(--text);
+  padding: 7px 8px;
+  font: inherit;
+}
+
+.auth-account-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.auth-account-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.auth-account-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-panel .action-primary,
+.auth-panel .action-secondary,
+.auth-panel .action-tertiary {
+  min-width: 0;
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.auth-panel .action-primary {
+  border: 1px solid var(--purple);
+  background: var(--purple);
+  color: #fff;
+}
+
+.auth-panel .action-secondary,
+.auth-panel .action-tertiary {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.auth-panel .action-tertiary {
+  color: var(--muted);
+}
+
+.auth-panel button:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
 .topbar {
   display: flex;
   align-items: center;

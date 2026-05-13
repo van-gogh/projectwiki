@@ -8,6 +8,13 @@ let collaborationState = {
   workspace: { configured: false, workspace: null },
   loaded: false,
 };
+let authConnectionState = {
+  mode: "idle",
+  busy: false,
+  message: null,
+  github: null,
+  gitea: null,
+};
 
 function dictionary() {
   const dictionaries = window.WhyWikiI18n || {};
@@ -80,6 +87,7 @@ function translate(lang, { rerender = false } = {}) {
   if (collaborationState.loaded) {
     renderAccountStatus(collaborationState.accounts);
     renderWorkspaceStatus(collaborationState.workspace);
+    renderAuthConnectionPanel();
   }
   if (rerender) {
     rerenderActiveViewAfterLanguageChange();
@@ -125,6 +133,269 @@ async function apiText(path, options = {}) {
     throw new Error(detail);
   }
   return response.text();
+}
+
+function authPanel() {
+  return document.querySelector("#authConnectionPanel");
+}
+
+function renderAuthMessage(kind, title, body = "") {
+  const message = createElement("div", `auth-message auth-message-${kind}`);
+  message.append(createElement("strong", "", title));
+  if (body) message.append(createElement("p", "", body));
+  return message;
+}
+
+async function startGithubLogin() {
+  authConnectionState = {
+    mode: "github_waiting",
+    busy: true,
+    message: { kind: "loading", title: t("auth.waiting"), body: t("auth.githubOpening") },
+    github: null,
+    gitea: null,
+  };
+  renderAuthConnectionPanel();
+
+  try {
+    const result = await api("/api/auth/github/device/start", { method: "POST", body: "{}" });
+    authConnectionState = {
+      mode: "github_waiting",
+      busy: false,
+      message: null,
+      github: {
+        deviceCode: result.device_code,
+        userCode: result.user_code,
+        verificationUri: result.verification_uri,
+        interval: result.interval || result.poll_after_seconds || 5,
+      },
+      gitea: null,
+    };
+    renderAuthConnectionPanel();
+    pollGithubDevice();
+  } catch (error) {
+    authConnectionState = {
+      ...authConnectionState,
+      mode: "github_failed",
+      busy: false,
+      message: {
+        kind: "error",
+        title: error.message && error.message.toLowerCase().includes("token storage") ? t("auth.tokenStorageUnavailable") : t("auth.setupNeeded"),
+        body: error.message || t("auth.failed"),
+      },
+    };
+    renderAuthConnectionPanel();
+  }
+}
+
+async function pollGithubDevice() {
+  const github = authConnectionState.github;
+  if (!github?.deviceCode || authConnectionState.mode !== "github_waiting") return;
+
+  try {
+    const result = await api("/api/auth/github/device/poll", {
+      method: "POST",
+      body: JSON.stringify({
+        device_code: github.deviceCode,
+        current_interval: github.interval,
+      }),
+    });
+
+    if (result.status === "connected") {
+      authConnectionState = {
+        mode: "connected",
+        busy: false,
+        message: { kind: "success", title: t("auth.connected"), body: providerAccountLabel(result.identity || {}) },
+        github: null,
+        gitea: null,
+      };
+      renderAuthConnectionPanel();
+      await loadCollaborationStatus();
+      return;
+    }
+
+    const nextInterval = result.poll_after_seconds || result.interval || github.interval;
+    authConnectionState.github = { ...github, interval: nextInterval };
+    authConnectionState.message = { kind: "loading", title: t("auth.waiting"), body: t("auth.githubOpening") };
+    renderAuthConnectionPanel();
+    window.setTimeout(pollGithubDevice, Math.max(1, nextInterval) * 1000);
+  } catch (error) {
+    authConnectionState = {
+      ...authConnectionState,
+      mode: "github_failed",
+      busy: false,
+      message: {
+        kind: "error",
+        title: error.message && error.message.toLowerCase().includes("token storage") ? t("auth.tokenStorageUnavailable") : t("auth.failed"),
+        body: error.message || t("auth.failed"),
+      },
+      github: null,
+    };
+    renderAuthConnectionPanel();
+  }
+}
+
+function renderGiteaForm() {
+  const form = createElement("form", "auth-form");
+  const baseUrlInput = document.createElement("input");
+  baseUrlInput.name = "base_url";
+  baseUrlInput.type = "url";
+  baseUrlInput.placeholder = "https://git.example.test";
+  baseUrlInput.required = true;
+  baseUrlInput.value = authConnectionState.gitea?.baseUrl || "";
+
+  const clientIdInput = document.createElement("input");
+  clientIdInput.name = "client_id";
+  clientIdInput.type = "text";
+  clientIdInput.autocomplete = "off";
+  clientIdInput.required = true;
+  clientIdInput.value = authConnectionState.gitea?.clientId || "";
+
+  appendLabeledControl(form, t("auth.giteaBaseUrl"), baseUrlInput);
+  appendLabeledControl(form, t("auth.clientId"), clientIdInput);
+  const submit = createActionButton(t("auth.openGitea"), "primary");
+  submit.type = "submit";
+  submit.disabled = authConnectionState.busy;
+  form.append(submit);
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    startGiteaLogin(new FormData(form));
+  });
+  return form;
+}
+
+async function startGiteaLogin(formData) {
+  const baseUrl = String(formData.get("base_url") || "").trim();
+  const clientId = String(formData.get("client_id") || "").trim();
+  authConnectionState = {
+    mode: "gitea_form",
+    busy: true,
+    message: { kind: "loading", title: t("auth.waiting"), body: t("auth.giteaReturn") },
+    github: null,
+    gitea: { baseUrl, clientId },
+  };
+  renderAuthConnectionPanel();
+
+  try {
+    const result = await api("/api/auth/gitea/start", {
+      method: "POST",
+      body: JSON.stringify({ base_url: baseUrl, client_id: clientId }),
+    });
+    authConnectionState = {
+      mode: "gitea_redirect",
+      busy: false,
+      message: { kind: "loading", title: t("auth.waiting"), body: t("auth.giteaReturn") },
+      github: null,
+      gitea: {
+        baseUrl,
+        clientId,
+        authorizationUrl: result.authorization_url,
+      },
+    };
+    renderAuthConnectionPanel();
+  } catch (error) {
+    authConnectionState = {
+      ...authConnectionState,
+      busy: false,
+      message: {
+        kind: "error",
+        title: error.message && error.message.toLowerCase().includes("token storage") ? t("auth.tokenStorageUnavailable") : t("auth.failed"),
+        body: error.message || t("auth.failed"),
+      },
+    };
+    renderAuthConnectionPanel();
+  }
+}
+
+async function disconnectAccount(identityKey) {
+  if (!identityKey) return;
+  authConnectionState = {
+    ...authConnectionState,
+    busy: true,
+    message: { kind: "loading", title: t("auth.waiting"), body: "" },
+  };
+  renderAuthConnectionPanel();
+  try {
+    await api(`/api/auth/accounts/${encodeURIComponent(identityKey)}`, { method: "DELETE" });
+    authConnectionState = { mode: "idle", busy: false, message: null, github: null, gitea: null };
+    await loadCollaborationStatus();
+  } catch (error) {
+    authConnectionState = {
+      ...authConnectionState,
+      busy: false,
+      message: {
+        kind: "error",
+        title: error.message && error.message.toLowerCase().includes("token storage") ? t("auth.tokenStorageUnavailable") : t("auth.failed"),
+        body: error.message || t("auth.failed"),
+      },
+    };
+    renderAuthConnectionPanel();
+  }
+}
+
+function accountIdentityKey(identity) {
+  if (identity.identity_key) return identity.identity_key;
+  if (identity.provider === "github" && identity.provider_user_id) return `github:${identity.provider_user_id}`;
+  if (identity.provider === "gitea" && identity.base_url && identity.provider_user_id) {
+    return `gitea:${identity.base_url}:${identity.provider_user_id}`;
+  }
+  return "";
+}
+
+function renderAuthConnectionPanel() {
+  const panel = authPanel();
+  if (!panel) return;
+
+  const children = [];
+  if (authConnectionState.message) {
+    children.push(renderAuthMessage(authConnectionState.message.kind, authConnectionState.message.title, authConnectionState.message.body));
+  }
+
+  if (authConnectionState.github) {
+    const githubBox = createElement("div", "auth-flow auth-flow-github");
+    githubBox.append(createElement("strong", "", t("auth.githubTitle")));
+    if (authConnectionState.github.userCode) {
+      githubBox.append(createElement("code", "auth-code", authConnectionState.github.userCode));
+    }
+    if (authConnectionState.github.verificationUri) {
+      const open = createActionButton(t("auth.openGithub"), "secondary", () => {
+        window.open(authConnectionState.github.verificationUri, "_blank", "noopener");
+      });
+      githubBox.append(open);
+    }
+    children.push(githubBox);
+  }
+
+  if (authConnectionState.mode === "gitea_form") {
+    const giteaBox = createElement("div", "auth-flow auth-flow-gitea");
+    giteaBox.append(createElement("strong", "", t("auth.giteaTitle")), renderGiteaForm());
+    children.push(giteaBox);
+  }
+
+  if (authConnectionState.gitea?.authorizationUrl) {
+    const open = createActionButton(t("auth.openGitea"), "secondary", () => {
+      window.open(authConnectionState.gitea.authorizationUrl, "_blank", "noopener");
+    });
+    const hint = renderAuthMessage("loading", t("auth.waiting"), t("auth.giteaReturn"));
+    children.push(hint, open);
+  }
+
+  const accounts = Array.isArray(collaborationState.accounts) ? collaborationState.accounts : [];
+  if (accounts.length) {
+    const list = createElement("div", "auth-account-list");
+    accounts.forEach((identity) => {
+      const row = createElement("div", "auth-account-row");
+      const meta = createElement("span", "auth-account-meta", providerAccountLabel(identity));
+      if (identity.base_url) meta.title = identity.base_url;
+      const identityKey = accountIdentityKey(identity);
+      const disconnect = createActionButton(t("auth.disconnect"), "tertiary", () => disconnectAccount(identityKey));
+      disconnect.disabled = !identityKey || authConnectionState.busy;
+      row.append(meta, disconnect);
+      list.append(row);
+    });
+    children.push(list);
+  }
+
+  panel.replaceChildren(...children);
 }
 
 function providerAccountLabel(identity) {
@@ -227,6 +498,7 @@ async function loadCollaborationStatus() {
     collaborationState.loaded = true;
     renderAccountStatus(collaborationState.accounts);
     renderWorkspaceStatus(collaborationState.workspace);
+    renderAuthConnectionPanel();
   }
 }
 
@@ -1560,6 +1832,26 @@ document.querySelectorAll("[data-view]").forEach((button) => {
   button.addEventListener("click", () => loadView(button.dataset.view));
 });
 
+const githubLoginButton = document.querySelector("#loginGithubButton");
+if (githubLoginButton) {
+  githubLoginButton.addEventListener("click", startGithubLogin);
+}
+
+const giteaLoginButton = document.querySelector("#loginGiteaButton");
+if (giteaLoginButton) {
+  giteaLoginButton.addEventListener("click", () => {
+    authConnectionState = {
+      mode: "gitea_form",
+      busy: false,
+      message: null,
+      github: null,
+      gitea: authConnectionState.gitea || {},
+    };
+    renderAuthConnectionPanel();
+  });
+}
+
+renderAuthConnectionPanel();
 translate(initialLanguage());
 loadCollaborationStatus();
 loadView("projects");
