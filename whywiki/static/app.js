@@ -280,6 +280,9 @@ async function startGiteaLogin(formData) {
       method: "POST",
       body: JSON.stringify({ base_url: baseUrl, client_id: clientId }),
     });
+    if (result.authorization_url) {
+      window.open(result.authorization_url, "_blank", "noopener");
+    }
     authConnectionState = {
       mode: "gitea_redirect",
       busy: false,
