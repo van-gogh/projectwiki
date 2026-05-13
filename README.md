@@ -99,6 +99,29 @@ Still intentionally shallow:
 - advanced AST analysis beyond Python basics
 - async worker queue
 
+## Collaboration Model
+
+WhyWiki uses Git providers for collaboration.
+
+A WhyWiki workspace is linked to a GitHub or Gitea repository. That workspace
+repository stores project-memory artifacts, not copies of the codebases it
+describes. Linked code repositories stay in their original providers and are
+referenced from WhyWiki by provider, repository, commit, path, and range.
+
+`whywiki.db` is a local, rebuildable cache and should not be committed. The
+workspace repository is the durable collaboration layer for configuration,
+facts, conflicts, review events, wiki pages, handover output, and pinned
+evidence-backed answers.
+
+Access is inherited from the provider:
+
+- Read access to the workspace repository means the user can enter the
+  workspace.
+- Write access to the workspace repository means the user can approve facts and
+  resolve conflicts.
+- Read access to linked source repositories means the user can inspect
+  source-backed evidence and rebuild project memory from the referenced source.
+
 ## Developer Setup
 
 ```bash

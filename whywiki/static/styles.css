@@ -92,6 +92,109 @@ body.has-current-project .project-pill {
   font-weight: 600;
 }
 
+.sidebar nav {
+  margin-bottom: 18px;
+}
+
+.collaboration-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  font-size: 12px;
+}
+
+.collaboration-panel__row {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.collaboration-panel__row > span:first-child {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.collaboration-panel__actions {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.collaboration-panel .secondary-action {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collaboration-panel .secondary-action:hover {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+
+.collaboration-panel .secondary-action:disabled,
+.collaboration-panel .secondary-action[aria-disabled="true"],
+.collaboration-panel .secondary-action:disabled:hover,
+.collaboration-panel .secondary-action[aria-disabled="true"]:hover {
+  border-color: var(--line);
+  background: #fbfbfc;
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: .74;
+}
+
+.status-pill {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 4px 8px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-pill.muted {
+  background: #fbfbfc;
+  color: var(--muted);
+}
+
+.status-pill.ok {
+  border-color: #bbf7d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.status-pill.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.linked-repo-status {
+  min-width: 0;
+  color: var(--muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.linked-repo-status.is-warning {
+  color: #b45309;
+}
+
 .topbar {
   display: flex;
   align-items: center;

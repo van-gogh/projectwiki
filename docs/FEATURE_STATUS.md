@@ -79,6 +79,26 @@ WhyWiki 首板的核心闭环是：
 | 测试 | 混乱项目测试夹具 | 已完成 | `tests/fixtures/messy-project` 仅作为测试/开发夹具使用，不作为产品内置 Demo 入口或 packaged asset。 |
 | 测试 | 核心单测和 API 测试 | 已完成 | 当前测试覆盖 parser、摄入/构建、runtime CLI、web assets、conflict detection、evidence outputs、API surface。 |
 
+## Git Provider Collaboration
+
+Status: planned foundation implemented in local APIs and CLI.
+
+Implemented surface:
+
+- workspace artifact schema
+- local connected-account metadata
+- provider permission abstraction
+- workspace read/write access reports
+- linked repo access reports
+- collaboration API and CLI status surfaces
+
+Not included in this slice:
+
+- source repo write actions
+- pull request creation
+- hosted storage
+- enterprise role management
+
 ## 第一版暂缓范围
 
 这些能力第一版明确不做：

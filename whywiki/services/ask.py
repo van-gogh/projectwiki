@@ -174,7 +174,12 @@ def ask_project(project_id: str, question: str, conn: sqlite3.Connection | None 
             ev = from_json(row["evidence_json"], [])
             path = ev[0].get("path", "unknown") if ev else "unknown"
             bullets.append(f"- {row['statement']}\n  - 证据：`{path}`")
-            evidence.append({"kind": "fact", "id": row["id"], "path": path, "score": score})
+            provider_fields = {
+                key: ev[0].get(key)
+                for key in ("provider", "base_url", "repo", "ref", "commit", "line_start", "line_end", "content_hash")
+                if ev and ev[0].get(key) is not None
+            }
+            evidence.append({"kind": "fact", "id": row["id"], "path": path, "score": score, **provider_fields})
         else:
             text = row["text"].strip().replace("\n", " ")
             if len(text) > 240:

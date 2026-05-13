@@ -1,7 +1,13 @@
 const supportedLanguages = ["zh-CN", "en-US"];
 let currentProjectId = storageGet("whywiki.currentProjectId");
 let currentProject = null;
+let activeView = "projects";
 let languageBounceTimer = null;
+let collaborationState = {
+  accounts: [],
+  workspace: { configured: false, workspace: null },
+  loaded: false,
+};
 
 function dictionary() {
   const dictionaries = window.WhyWikiI18n || {};
@@ -58,7 +64,7 @@ function updateLanguageSwitch(lang) {
   });
 }
 
-function translate(lang) {
+function translate(lang, { rerender = false } = {}) {
   const normalizedLang = normalizeLanguage(lang);
   const dictionaries = window.WhyWikiI18n || {};
   const dict = dictionaries[normalizedLang] || dictionaries["en-US"] || {};
@@ -71,6 +77,13 @@ function translate(lang) {
   });
   updateLanguageSwitch(normalizedLang);
   storageSet("whywiki.language", normalizedLang);
+  if (collaborationState.loaded) {
+    renderAccountStatus(collaborationState.accounts);
+    renderWorkspaceStatus(collaborationState.workspace);
+  }
+  if (rerender) {
+    rerenderActiveViewAfterLanguageChange();
+  }
 }
 
 async function api(path, options = {}) {
@@ -114,9 +127,115 @@ async function apiText(path, options = {}) {
   return response.text();
 }
 
+function providerAccountLabel(identity) {
+  const provider = identity.provider || "provider";
+  const account = identity.account || identity.provider_user_id || "";
+  return account ? `${provider}:${account}` : provider;
+}
+
+function renderAccountStatus(accounts) {
+  const status = document.querySelector("#accountStatus");
+  if (!status) return;
+
+  const accountList = Array.isArray(accounts) ? accounts : [];
+  if (!accountList.length) {
+    status.className = "status-pill muted";
+    status.textContent = t("notConnected");
+    return;
+  }
+
+  status.className = "status-pill ok";
+  status.textContent = accountList.map(providerAccountLabel).join(", ");
+}
+
+function missingLinkedRepoPermissions(workspace) {
+  const access = workspace?.access || workspace;
+  if (Array.isArray(access?.missing_required_linked_repo_permissions)) {
+    return access.missing_required_linked_repo_permissions;
+  }
+  if (Array.isArray(access?.linked_repos)) {
+    return access.linked_repos.filter((permission) => permission && permission.can_read === false);
+  }
+  return [];
+}
+
+function renderWorkspaceStatus(workspace) {
+  const status = document.querySelector("#workspaceStatus");
+  const linkedRepoStatus = document.querySelector("#linkedRepoStatus");
+  if (!status) return;
+
+  if (!workspace?.configured || !workspace.workspace) {
+    status.className = "status-pill muted";
+    status.textContent = t("notConfigured");
+    if (linkedRepoStatus) {
+      linkedRepoStatus.textContent = "";
+      linkedRepoStatus.classList.remove("is-warning");
+    }
+    return;
+  }
+
+  const access = workspace.access || null;
+  if (access && !access.can_enter_workspace) {
+    status.className = "status-pill warning";
+    status.textContent = t("workspaceAccessDenied");
+    if (linkedRepoStatus) {
+      linkedRepoStatus.textContent = access.workspace?.repo_key || workspace.workspace.repo || "";
+      linkedRepoStatus.classList.add("is-warning");
+    }
+    return;
+  }
+
+  if (access && !access.can_review) {
+    status.className = "status-pill muted";
+    status.textContent = t("workspaceReadOnly");
+  } else {
+    status.className = "status-pill ok";
+    status.textContent = workspace.workspace.repo || t("workspaceReady");
+  }
+
+  if (!linkedRepoStatus) return;
+  const missingPermissions = missingLinkedRepoPermissions(workspace);
+  if (access?.missing_required_linked_repo_access || workspace.missing_required_linked_repo_access || missingPermissions.length) {
+    const repos = missingPermissions.map((permission) => permission.repo_key).filter(Boolean).join(", ");
+    linkedRepoStatus.textContent = repos ? `${t("missingLinkedRepoAccess")}: ${repos}` : t("missingLinkedRepoAccess");
+    linkedRepoStatus.classList.add("is-warning");
+    return;
+  }
+  linkedRepoStatus.textContent = "";
+  linkedRepoStatus.classList.remove("is-warning");
+}
+
+function workspaceStatusPath() {
+  if (!currentProjectId) return "/api/workspace/status";
+  return `/api/workspace/status?project_slug=${encodeURIComponent(currentProjectId)}`;
+}
+
+async function loadCollaborationStatus() {
+  const fallbackWorkspace = { configured: false, workspace: null };
+  try {
+    const [accountsResult, workspaceResult] = await Promise.allSettled([
+      api("/api/auth/accounts"),
+      api(workspaceStatusPath()),
+    ]);
+    const accountsPayload = accountsResult.status === "fulfilled" ? accountsResult.value : { connected_accounts: [] };
+    collaborationState.accounts = Array.isArray(accountsPayload.connected_accounts) ? accountsPayload.connected_accounts : [];
+    collaborationState.workspace = workspaceResult.status === "fulfilled" ? workspaceResult.value : fallbackWorkspace;
+  } catch {
+    collaborationState.accounts = [];
+    collaborationState.workspace = fallbackWorkspace;
+  } finally {
+    collaborationState.loaded = true;
+    renderAccountStatus(collaborationState.accounts);
+    renderWorkspaceStatus(collaborationState.workspace);
+  }
+}
+
 function setCurrentProjectId(projectId) {
   currentProjectId = projectId;
   storageSet("whywiki.currentProjectId", projectId);
+  if (collaborationState.loaded) {
+    loadCollaborationStatus();
+  }
 }
 
 function setCurrentProject(project) {
@@ -164,6 +283,14 @@ function appendField(list, label, value) {
 
 function appContainer() {
   return document.querySelector("#app");
+}
+
+function rerenderActiveViewAfterLanguageChange() {
+  if (!appContainer()) return;
+  loadView(activeView).catch((error) => {
+    const appNode = appContainer();
+    if (appNode) appNode.textContent = `${t("view.error")}: ${error.message}`;
+  });
 }
 
 function setActiveView(view) {
@@ -1376,12 +1503,12 @@ async function renderSettings() {
 async function loadView(view) {
   const appNode = appContainer();
   if (!appNode) return;
-  const normalizedView = view || "projects";
-  setActiveView(normalizedView);
+  activeView = view || "projects";
+  setActiveView(activeView);
   appNode.replaceChildren(renderOperationFeedback("loading", t("view.loading")));
 
   try {
-    if (normalizedView === "projects") {
+    if (activeView === "projects") {
       appNode.replaceChildren(await renderProjectsHome());
       return;
     }
@@ -1405,7 +1532,7 @@ async function loadView(view) {
     };
     await ensureCurrentProject();
     updateWorkspaceChrome(true);
-    const renderer = renderers[normalizedView] || renderStatus;
+    const renderer = renderers[activeView] || renderStatus;
     appNode.replaceChildren(await renderer(projectId));
   } catch (error) {
     appNode.replaceChildren(renderOperationFeedback("error", t("view.error"), `${error.message} ${t("operation.error.recovery")}`));
@@ -1413,7 +1540,7 @@ async function loadView(view) {
 }
 
 document.querySelectorAll("[data-lang]").forEach((button) => {
-  button.addEventListener("click", () => translate(button.dataset.lang));
+  button.addEventListener("click", () => translate(button.dataset.lang, { rerender: true }));
 });
 
 const actionHandlers = {
@@ -1434,4 +1561,5 @@ document.querySelectorAll("[data-view]").forEach((button) => {
 });
 
 translate(initialLanguage());
+loadCollaborationStatus();
 loadView("projects");

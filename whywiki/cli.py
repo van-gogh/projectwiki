@@ -5,6 +5,15 @@ import json
 import os
 import sys
 
+from .collaboration.accounts import AccountStore
+from .collaboration.artifacts import (
+    WorkspaceArtifactPaths,
+    load_workspace_config,
+    save_workspace_config,
+)
+from .collaboration.env import static_provider_registry_from_env
+from .collaboration.models import ProviderIdentity, RepoRef, WorkspaceConfig
+from .config import get_data_dir
 from .db import init_db
 from .runtime import (
     PortInUseError,
@@ -21,9 +30,22 @@ from .runtime import (
     write_runtime_state,
 )
 from .services.ask import ask_project
+from .services.collaboration import CollaborationService
 from .services.ingest import ingest_path
 from .services.wiki_engine import build_project
 from .services.workspace import create_project, list_projects
+
+
+def print_json(payload: object) -> None:
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def account_store() -> AccountStore:
+    return AccountStore(get_data_dir() / "auth" / "accounts.json")
+
+
+def workspace_paths() -> WorkspaceArtifactPaths:
+    return WorkspaceArtifactPaths(get_data_dir() / "workspace")
 
 
 def prompt_choice(prompt: str, choices: set[str], default: str) -> str:
@@ -128,6 +150,26 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("doctor")
     sub.add_parser("stop")
 
+    p_auth = sub.add_parser("auth")
+    auth_sub = p_auth.add_subparsers(dest="auth_command", required=True)
+    auth_sub.add_parser("list")
+
+    p_auth_login = auth_sub.add_parser("login")
+    p_auth_login.add_argument("provider", choices=["github", "gitea"])
+    p_auth_login.add_argument("--account", required=True)
+    p_auth_login.add_argument("--provider-user-id", required=True)
+    p_auth_login.add_argument("--base-url")
+
+    p_workspace = sub.add_parser("workspace")
+    workspace_sub = p_workspace.add_subparsers(dest="workspace_command", required=True)
+
+    p_workspace_connect = workspace_sub.add_parser("connect")
+    p_workspace_connect.add_argument("provider", choices=["github", "gitea"])
+    p_workspace_connect.add_argument("repo")
+    p_workspace_connect.add_argument("--base-url")
+
+    workspace_sub.add_parser("status")
+
     args = parser.parse_args(argv)
 
     if args.command == "init-db":
@@ -155,6 +197,58 @@ def main(argv: list[str] | None = None) -> int:
         result = ask_project(args.project_id, args.question)
         print(result["answer"])
         return 0
+
+    if args.command == "auth":
+        if args.auth_command == "list":
+            print_json({
+                "connected_accounts": [
+                    identity.to_dict()
+                    for identity in account_store().list_identities()
+                ]
+            })
+            return 0
+
+        if args.auth_command == "login":
+            try:
+                identity = ProviderIdentity(
+                    provider=args.provider,
+                    account=args.account,
+                    provider_user_id=args.provider_user_id,
+                    base_url=args.base_url,
+                )
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+            account_store().save_identity(identity)
+            print_json(identity.to_dict())
+            return 0
+
+    if args.command == "workspace":
+        paths = workspace_paths()
+        if args.workspace_command == "connect":
+            try:
+                config = WorkspaceConfig(
+                    workspace=RepoRef(
+                        provider=args.provider,
+                        repo=args.repo,
+                        base_url=args.base_url,
+                    )
+                )
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 2
+            save_workspace_config(paths, config)
+            print_json({"workspace": config.workspace.to_dict()})
+            return 0
+
+        if args.workspace_command == "status":
+            if not paths.workspace_config_path.exists():
+                print_json({"configured": False, "workspace": None, "projects": {}, "access": None})
+                return 0
+            config = load_workspace_config(paths)
+            access = CollaborationService(config, static_provider_registry_from_env()).check_workspace(project_slug=None)
+            print_json({"configured": True, **config.to_dict(), "access": access.to_dict()})
+            return 0
 
     if args.command == "serve":
         paths = default_runtime_paths()

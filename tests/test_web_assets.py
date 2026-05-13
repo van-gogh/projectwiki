@@ -139,6 +139,68 @@ def test_i18n_contains_chinese_and_english_dictionaries():
     assert "error.readLogs" in content
 
 
+def test_sidebar_exposes_collaboration_status_targets():
+    content = (STATIC / "index.html").read_text(encoding="utf-8")
+
+    assert 'id="accountStatus"' in content
+    assert 'id="loginGithubButton"' in content
+    assert 'id="loginGiteaButton"' in content
+    assert 'id="workspaceStatus"' in content
+    assert 'id="linkedRepoStatus"' in content
+
+
+def test_login_provider_placeholders_are_disabled():
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+    for button_id in ("loginGithubButton", "loginGiteaButton"):
+        pattern = rf'<button[^>]*id="{button_id}"[^>]*disabled[^>]*aria-disabled="true"'
+        assert re.search(pattern, html), f"{button_id} must be visibly disabled until OAuth exists"
+    assert ".secondary-action:disabled" in css
+    assert '[aria-disabled="true"]' in css
+
+
+def test_i18n_includes_git_provider_collaboration_copy():
+    content = (STATIC / "i18n.js").read_text(encoding="utf-8")
+
+    assert "Login with GitHub" in content
+    assert "Login with Gitea" in content
+    assert "No workspace access" in content
+    assert "Workspace read-only" in content
+    assert "缺少代码仓库访问权限" in content
+
+
+def test_app_js_fetches_collaboration_status_endpoints():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "/api/auth/accounts" in content
+    assert "/api/workspace/status" in content
+    assert "workspaceStatusPath" in content
+    assert "project_slug=" in content
+    assert "encodeURIComponent(currentProjectId)" in content
+
+
+def test_app_js_renders_workspace_access_report():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+    assert "workspace.access" in content
+    assert "can_enter_workspace" in content
+    assert "can_review" in content
+    assert "workspaceAccessDenied" in content
+    assert "workspaceReadOnly" in content
+    assert ".status-pill.warning" in css
+
+
+def test_app_js_rerenders_active_view_after_language_change():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "activeView" in content
+    assert "rerenderActiveViewAfterLanguageChange" in content
+    assert "function translate(lang, { rerender = false } = {})" in content
+    assert 'translate(button.dataset.lang, { rerender: true })' in content
+
+
 def test_i18n_buttons_have_english_fallback_labels():
     parser = parse_dashboard()
 

@@ -2,10 +2,13 @@ from pathlib import Path
 
 import pytest
 
+from whywiki.collaboration.models import EvidencePointer as ProviderEvidencePointer
+from whywiki.db import connect, init_db
 from whywiki.services.ask import ask_project
 from whywiki.services.ingest import ingest_path
 from whywiki.services.wiki_engine import build_project
 from whywiki.services.workspace import create_project
+from whywiki.utils import now_iso, to_json
 
 
 def build_messy_fixture(tmp_path, monkeypatch):
@@ -25,6 +28,118 @@ def test_ask_returns_structured_evidence(tmp_path, monkeypatch):
     assert result["evidence"]
     assert {"kind", "id", "path", "score"}.issubset(result["evidence"][0])
     assert "证据" in result["answer"]
+
+
+def test_provider_evidence_pointer_serializes_repo_location():
+    pointer = ProviderEvidencePointer(
+        provider="gitea",
+        base_url="https://git.example.test",
+        repo="team/backend",
+        commit="abc123",
+        path="src/main.py",
+        line_start=10,
+        line_end=12,
+        content_hash="sha256:abc",
+    )
+
+    payload = pointer.to_dict()
+
+    assert payload["provider"] == "gitea"
+    assert payload["base_url"] == "https://git.example.test"
+    assert payload["repo"] == "team/backend"
+    assert payload["commit"] == "abc123"
+    assert payload["line_start"] == 10
+
+
+def test_ask_preserves_provider_fields_from_fact_evidence(tmp_path):
+    conn = connect(tmp_path / "whywiki.db")
+    init_db(conn)
+    project = create_project("Provider Demo", conn=conn)
+    now = now_iso()
+    source_id = "src_provider"
+    block_id = "blk_provider"
+    fact_id = "fact_provider"
+    provider_evidence = {
+        "provider": "gitea",
+        "base_url": "https://git.example.test",
+        "repo": "team/backend",
+        "ref": "main",
+        "commit": "abc123",
+        "path": "src/main.py",
+        "line_start": 10,
+        "line_end": 12,
+        "content_hash": "sha256:abc",
+        "source_id": source_id,
+        "block_id": block_id,
+    }
+    conn.execute(
+        """
+        INSERT INTO sources(id, project_id, source_type, path, title, content_hash, metadata_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            source_id,
+            project["id"],
+            "git",
+            "src/main.py",
+            "main.py",
+            "sha256:source",
+            to_json({}),
+            now,
+            now,
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO blocks(id, project_id, source_id, block_type, text, location_json, metadata_json, content_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            block_id,
+            project["id"],
+            source_id,
+            "code_file",
+            "Unrelated local block text.",
+            to_json({"line_start": 10, "line_end": 12}),
+            to_json({}),
+            "sha256:block",
+        ),
+    )
+    conn.execute(
+        """
+        INSERT INTO facts(id, project_id, fact_type, statement, evidence_json, status, confidence, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            fact_id,
+            project["id"],
+            "code",
+            "Provider metadata is preserved for ask evidence.",
+            to_json([provider_evidence]),
+            "candidate",
+            0.9,
+            now,
+        ),
+    )
+    conn.commit()
+
+    result = ask_project(project["id"], "provider metadata", conn=conn)
+
+    assert result["evidence"]
+    assert result["evidence"][0] == {
+        "kind": "fact",
+        "id": fact_id,
+        "path": "src/main.py",
+        "score": 2.9,
+        "provider": "gitea",
+        "base_url": "https://git.example.test",
+        "repo": "team/backend",
+        "ref": "main",
+        "commit": "abc123",
+        "line_start": 10,
+        "line_end": 12,
+        "content_hash": "sha256:abc",
+    }
 
 
 def test_ask_returns_evidence_for_exact_docker_term(tmp_path, monkeypatch):
