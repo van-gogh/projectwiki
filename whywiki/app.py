@@ -142,7 +142,7 @@ def workspace_status_payload(project_slug: str | None = None) -> dict:
 def validate_gitea_base_url(base_url: str) -> str:
     value = base_url.strip().rstrip("/")
     parsed = urlparse(value)
-    if not value or parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if not value or parsed.scheme not in {"http", "https"} or not parsed.netloc or not parsed.hostname:
         raise HTTPException(status_code=400, detail="base_url must be an http(s) URL with a host.")
     return value
 

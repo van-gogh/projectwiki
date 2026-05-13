@@ -200,10 +200,19 @@ def test_gitea_start_requires_base_url_and_client_id():
     assert "client_id" in missing_client_id.json()["detail"]
 
 
-def test_gitea_start_rejects_non_http_base_url():
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "ftp://git.example.test",
+        "http://:8765",
+        "http://@",
+        "http://user@:80",
+    ],
+)
+def test_gitea_start_rejects_invalid_base_url(base_url):
     response = _client().post(
         "/api/auth/gitea/start",
-        json={"base_url": "ftp://git.example.test", "client_id": "gitea-client"},
+        json={"base_url": base_url, "client_id": "gitea-client"},
     )
 
     assert response.status_code == 400
