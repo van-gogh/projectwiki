@@ -145,6 +145,12 @@ class ProviderIdentity:
     def provider_key(self) -> str:
         return _provider_key(self.provider, self.base_url)
 
+    @property
+    def identity_key(self) -> str:
+        if self.provider == "github":
+            return f"github:{self.provider_user_id}"
+        return f"gitea:{self.base_url}:{self.provider_user_id}"
+
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "provider": self.provider,

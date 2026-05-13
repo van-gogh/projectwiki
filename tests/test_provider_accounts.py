@@ -84,3 +84,17 @@ def test_account_store_strips_existing_token_fields_on_save(tmp_path):
     content = accounts_path.read_text(encoding="utf-8").lower()
     assert "token" not in content
     assert "secret" not in content
+
+
+def test_account_store_deletes_identity_by_identity_key(tmp_path):
+    store = AccountStore(tmp_path / "auth" / "accounts.json")
+    store.save_identity(ProviderIdentity(provider="github", account="alice", provider_user_id="1"))
+    store.save_identity(
+        ProviderIdentity(provider="gitea", account="bob", provider_user_id="2", base_url="https://git.test")
+    )
+
+    assert store.delete_identity("github:1")
+    assert store.list_identities() == [
+        ProviderIdentity(provider="gitea", account="bob", provider_user_id="2", base_url="https://git.test")
+    ]
+    assert not store.delete_identity("github:missing")

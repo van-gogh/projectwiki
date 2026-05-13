@@ -54,6 +54,18 @@ class AccountStore:
     def has_provider_identity(self, provider_key: str) -> bool:
         return any(identity.provider_key == provider_key for identity in self.list_identities())
 
+    def delete_identity(self, identity_key: str) -> bool:
+        identities = self.list_identities()
+        kept = [identity for identity in identities if identity.identity_key != identity_key]
+        if len(kept) == len(identities):
+            return False
+
+        write_json(
+            self.path,
+            {_CONNECTED_ACCOUNTS_KEY: [identity.to_dict() for identity in kept]},
+        )
+        return True
+
 
 def _is_same_provider_identity(left: ProviderIdentity, right: ProviderIdentity) -> bool:
     return (
