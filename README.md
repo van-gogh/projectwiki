@@ -122,6 +122,23 @@ Access is inherited from the provider:
 - Read access to linked source repositories means the user can inspect
   source-backed evidence and rebuild project memory from the referenced source.
 
+### Real Provider Login
+
+WhyWiki can connect GitHub and Gitea accounts for local workspace access checks.
+
+- GitHub login uses OAuth device flow. Set `WHYWIKI_GITHUB_CLIENT_ID` before
+  starting WhyWiki.
+- Gitea login uses OAuth2 Authorization Code with PKCE. Register a public OAuth
+  application on the Gitea server and use
+  `http://127.0.0.1:8765/api/auth/gitea/callback` as the redirect URL.
+- Tokens are stored in the operating system credential store when available:
+  macOS Keychain, Windows Credential Manager / DPAPI-backed storage, or Linux
+  Secret Service.
+- `accounts.json` stores only account metadata and never stores tokens.
+- If no OS credential backend is available, WhyWiki fails clearly. For local
+  development only, set `WHYWIKI_ALLOW_FILE_TOKEN_STORE=1` to use
+  `.whywiki/auth/tokens.json`.
+
 ## Developer Setup
 
 ```bash

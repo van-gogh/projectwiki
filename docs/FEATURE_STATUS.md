@@ -71,6 +71,7 @@ WhyWiki 首板的核心闭环是：
 | Web UI | 需求问答视图 | 已完成 | 有默认问题，渲染 answer 和 structured evidence。 |
 | Web UI | Settings / handover export | 部分完成 | Settings 能展示 handover；更完整的导出/下载体验未做。 |
 | Web UI | 中英文切换 | 已完成 | 有中文/英文 language switch，并由 web asset tests 覆盖。 |
+| Git provider login | 真实 Provider 登录 | 已完成 | GitHub device flow 和 Gitea PKCE 可在本地连接 provider 账号；token 不进入 `accounts.json`，默认走系统凭据存储，开发环境可显式启用文件 fallback。 |
 | Web UI | 证据原文查看 | 已完成 | `GET /api/projects/{project_id}/facts/{fact_id}/evidence` 和 `/conflicts/{conflict_id}/evidence` 会解析 evidence pointer，返回原始 block 片段、来源、路径和位置；Web 证据抽屉可加载原文。 |
 | Web UI | 扫描/生成进度 | 已完成 | Web 扫描和生成 Wiki 走 `ingest-jobs`、`build-jobs` 与 `/api/jobs/{job_id}` 轮询，状态持久化在 `operation_jobs`。 |
 | API | Project API | 已完成 | create/list/get project endpoints 已存在。 |
@@ -81,12 +82,16 @@ WhyWiki 首板的核心闭环是：
 
 ## Git Provider Collaboration
 
-Status: planned foundation implemented in local APIs and CLI.
+Status: real provider login and token-backed workspace checks implemented for
+local GitHub and Gitea accounts.
 
 Implemented surface:
 
 - workspace artifact schema
 - local connected-account metadata
+- GitHub OAuth device-flow login
+- Gitea OAuth2 Authorization Code with PKCE login
+- OS credential token storage with explicit development file fallback
 - provider permission abstraction
 - workspace read/write access reports
 - linked repo access reports
