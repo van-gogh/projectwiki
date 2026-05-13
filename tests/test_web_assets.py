@@ -140,6 +140,8 @@ def test_sidebar_exposes_collaboration_status_targets():
     content = (STATIC / "index.html").read_text(encoding="utf-8")
 
     assert 'id="accountStatus"' in content
+    assert 'id="loginGithubButton"' in content
+    assert 'id="loginGiteaButton"' in content
     assert 'id="workspaceStatus"' in content
     assert 'id="linkedRepoStatus"' in content
 
