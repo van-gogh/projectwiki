@@ -1,5 +1,6 @@
 const supportedLanguages = ["zh-CN", "en-US"];
 let currentProjectId = storageGet("whywiki.currentProjectId");
+let activeView = "start";
 let languageBounceTimer = null;
 let collaborationState = {
   accounts: [],
@@ -58,7 +59,7 @@ function updateLanguageSwitch(lang) {
   });
 }
 
-function translate(lang) {
+function translate(lang, { rerender = false } = {}) {
   const normalizedLang = normalizeLanguage(lang);
   const dictionaries = window.WhyWikiI18n || {};
   const dict = dictionaries[normalizedLang] || dictionaries["en-US"] || {};
@@ -74,6 +75,9 @@ function translate(lang) {
   if (collaborationState.loaded) {
     renderAccountStatus(collaborationState.accounts);
     renderWorkspaceStatus(collaborationState.workspace);
+  }
+  if (rerender) {
+    rerenderActiveViewAfterLanguageChange();
   }
 }
 
@@ -213,6 +217,14 @@ function appendField(list, label, value) {
 
 function appContainer() {
   return document.querySelector("#app");
+}
+
+function rerenderActiveViewAfterLanguageChange() {
+  if (!appContainer()) return;
+  loadView(activeView).catch((error) => {
+    const appNode = appContainer();
+    if (appNode) appNode.textContent = `${t("view.error")}: ${error.message}`;
+  });
 }
 
 function setActiveView(view) {
@@ -911,16 +923,17 @@ async function renderSettings() {
 async function loadView(view) {
   const appNode = appContainer();
   if (!appNode) return;
-  setActiveView(view);
+  activeView = view || "start";
+  setActiveView(activeView);
   appNode.textContent = t("view.loading");
 
   try {
-    if (view === "start") {
+    if (activeView === "start") {
       appNode.replaceChildren(renderStart());
       return;
     }
 
-    if (view === "projects") {
+    if (activeView === "projects") {
       appNode.replaceChildren(await renderProjects());
       return;
     }
@@ -942,7 +955,7 @@ async function loadView(view) {
       ask: renderAsk,
       settings: renderSettings,
     };
-    const renderer = renderers[view] || renderProjects;
+    const renderer = renderers[activeView] || renderProjects;
     appNode.replaceChildren(await renderer(projectId));
   } catch (error) {
     appNode.textContent = `${t("view.error")}: ${error.message}`;
@@ -950,7 +963,7 @@ async function loadView(view) {
 }
 
 document.querySelectorAll("[data-lang]").forEach((button) => {
-  button.addEventListener("click", () => translate(button.dataset.lang));
+  button.addEventListener("click", () => translate(button.dataset.lang, { rerender: true }));
 });
 
 const actionHandlers = {

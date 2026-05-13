@@ -146,6 +146,17 @@ def test_sidebar_exposes_collaboration_status_targets():
     assert 'id="linkedRepoStatus"' in content
 
 
+def test_login_provider_placeholders_are_disabled():
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+    for button_id in ("loginGithubButton", "loginGiteaButton"):
+        pattern = rf'<button[^>]*id="{button_id}"[^>]*disabled[^>]*aria-disabled="true"'
+        assert re.search(pattern, html), f"{button_id} must be visibly disabled until OAuth exists"
+    assert ".secondary-action:disabled" in css
+    assert '[aria-disabled="true"]' in css
+
+
 def test_i18n_includes_git_provider_collaboration_copy():
     content = (STATIC / "i18n.js").read_text(encoding="utf-8")
 
@@ -159,6 +170,15 @@ def test_app_js_fetches_collaboration_status_endpoints():
 
     assert "/api/auth/accounts" in content
     assert "/api/workspace/status" in content
+
+
+def test_app_js_rerenders_active_view_after_language_change():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "activeView" in content
+    assert "rerenderActiveViewAfterLanguageChange" in content
+    assert "function translate(lang, { rerender = false } = {})" in content
+    assert 'translate(button.dataset.lang, { rerender: true })' in content
 
 
 def test_i18n_buttons_have_english_fallback_labels():
