@@ -1,11 +1,45 @@
+import json
+
+import pytest
 from fastapi.testclient import TestClient
 
+from whywiki.collaboration.accounts import AccountStore
 from whywiki.collaboration.artifacts import WorkspaceArtifactPaths, save_workspace_config
-from whywiki.collaboration.models import LinkedRepo, RepoRef, WorkspaceConfig
+from whywiki.collaboration.models import LinkedRepo, ProviderIdentity, RepoRef, WorkspaceConfig
+from whywiki.collaboration.tokens import FileTokenStore, KeyringTokenStore, ProviderToken
 from whywiki.app import app
 from whywiki.db import connect
 from whywiki.services.conflict_detector import insert_conflict
 from whywiki.services.workspace import create_project
+
+
+class _FakeHTTPResponse:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+
+    def __enter__(self) -> "_FakeHTTPResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(self._payload).encode("utf-8")
+
+
+def _request_header(request, name: str) -> str | None:
+    for header_name, value in request.header_items():
+        if header_name.lower() == name.lower():
+            return value
+    return None
+
+
+@pytest.fixture(autouse=True)
+def isolate_provider_auth_env(monkeypatch):
+    monkeypatch.delenv("WHYWIKI_COLLAB_STATIC_PERMISSIONS", raising=False)
+    monkeypatch.delenv("WHYWIKI_ALLOW_FILE_TOKEN_STORE", raising=False)
+    monkeypatch.delenv("WHYWIKI_GITHUB_CLIENT_ID", raising=False)
+    monkeypatch.setattr(KeyringTokenStore, "available", lambda self: False)
 
 
 def project_with_conflict() -> tuple[str, str]:
@@ -65,6 +99,41 @@ def test_workspace_status_reads_configured_workspace(tmp_path, monkeypatch):
     assert status.json()["workspace"]["repo"] == "owner/whywiki-memory"
     assert status.json()["access"]["can_enter_workspace"] is False
     assert status.json()["access"]["workspace"]["missing_provider_identity"] == "github"
+
+
+def test_workspace_status_uses_stored_provider_token(tmp_path, monkeypatch):
+    captured_requests = []
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("WHYWIKI_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("WHYWIKI_ALLOW_FILE_TOKEN_STORE", "1")
+    monkeypatch.setattr(KeyringTokenStore, "available", lambda self: False)
+
+    identity = ProviderIdentity(provider="github", account="alice", provider_user_id="1")
+    AccountStore(data_dir / "auth" / "accounts.json").save_identity(identity)
+    FileTokenStore.from_env(data_dir / "auth" / "tokens.json").save(
+        identity,
+        ProviderToken(access_token="github-token"),
+    )
+
+    def fake_urlopen(request, timeout):
+        captured_requests.append(request)
+        return _FakeHTTPResponse({"permissions": {"push": True}})
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    client = TestClient(app)
+
+    create = client.post(
+        "/api/workspace/connect",
+        json={"provider": "github", "repo": "owner/whywiki-memory"},
+    )
+    status = client.get("/api/workspace/status")
+
+    assert create.status_code == 200
+    assert status.status_code == 200
+    assert _request_header(captured_requests[0], "Authorization") == "Bearer github-token"
+    assert "github-token" not in captured_requests[0].get_full_url()
+    assert status.json()["access"]["can_enter_workspace"] is True
+    assert status.json()["access"]["can_review"] is True
 
 
 def test_workspace_status_reports_project_linked_repo_access(tmp_path, monkeypatch):

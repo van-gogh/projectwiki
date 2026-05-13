@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -15,6 +16,8 @@ from .collaboration.artifacts import (
 )
 from .collaboration.env import static_provider_registry_from_env
 from .collaboration.models import RepoRef, WorkspaceConfig
+from .collaboration.registry import provider_registry_from_accounts
+from .collaboration.tokens import TokenStoreUnavailable, default_token_store
 from .config import get_data_dir
 from .db import connect, init_db, rows_to_dicts
 from .services.ask import ask_project
@@ -66,13 +69,24 @@ def workspace_paths() -> WorkspaceArtifactPaths:
     return WorkspaceArtifactPaths(get_data_dir() / "workspace")
 
 
+def provider_registry():
+    try:
+        return provider_registry_from_accounts(
+            account_store().list_identities(),
+            default_token_store(),
+            os.environ,
+        )
+    except TokenStoreUnavailable:
+        return static_provider_registry_from_env()
+
+
 def collaboration_service_or_none() -> CollaborationService | None:
     paths = workspace_paths()
     if not paths.workspace_config_path.exists():
         return None
     return CollaborationService(
         load_workspace_config(paths),
-        static_provider_registry_from_env(),
+        provider_registry(),
     )
 
 
@@ -81,7 +95,7 @@ def workspace_status_payload(project_slug: str | None = None) -> dict:
     if not paths.workspace_config_path.exists():
         return {"configured": False, "workspace": None, "projects": {}, "access": None}
     config = load_workspace_config(paths)
-    report = CollaborationService(config, static_provider_registry_from_env()).check_workspace(project_slug)
+    report = CollaborationService(config, provider_registry()).check_workspace(project_slug)
     return {"configured": True, **config.to_dict(), "access": report.to_dict()}
 
 

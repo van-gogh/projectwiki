@@ -3,13 +3,15 @@ from urllib.error import HTTPError
 
 import pytest
 
-from whywiki.collaboration.models import RepoRef
+from whywiki.collaboration.models import ProviderIdentity, RepoRef
 from whywiki.collaboration.providers import (
     GiteaProviderClient,
     GitHubProviderClient,
     ProviderRegistry,
     StaticProviderClient,
 )
+from whywiki.collaboration.registry import provider_registry_from_accounts
+from whywiki.collaboration.tokens import ProviderToken
 
 
 class _FakeHTTPResponse:
@@ -24,6 +26,20 @@ class _FakeHTTPResponse:
 
     def read(self) -> bytes:
         return json.dumps(self._payload).encode("utf-8")
+
+
+class _MemoryTokenStore:
+    def __init__(self) -> None:
+        self._tokens: dict[str, ProviderToken] = {}
+
+    def save(self, identity: ProviderIdentity, token: ProviderToken) -> None:
+        self._tokens[identity.identity_key] = token
+
+    def load(self, identity: ProviderIdentity) -> ProviderToken | None:
+        return self._tokens.get(identity.identity_key)
+
+    def delete(self, identity: ProviderIdentity) -> bool:
+        return self._tokens.pop(identity.identity_key, None) is not None
 
 
 def _http_error(status_code: int) -> HTTPError:
@@ -62,6 +78,66 @@ def test_static_provider_returns_configured_permission():
     assert workspace.can_write is True
     assert code.can_read is True
     assert code.can_write is False
+
+
+def test_provider_registry_from_accounts_uses_stored_github_token(monkeypatch):
+    captured_requests = []
+    identity = ProviderIdentity(provider="github", account="alice", provider_user_id="1")
+    token_store = _MemoryTokenStore()
+    token_store.save(identity, ProviderToken(access_token="github-token"))
+
+    def fake_urlopen(request, timeout):
+        captured_requests.append(request)
+        return _FakeHTTPResponse({"permissions": {"push": True}})
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    registry = provider_registry_from_accounts([identity], token_store, env={})
+    permission = registry.check_repo(RepoRef(provider="github", repo="owner/whywiki-memory"))
+
+    request = captured_requests[0]
+    assert _request_header(request, "Authorization") == "Bearer github-token"
+    assert "github-token" not in request.get_full_url()
+    assert permission.can_read is True
+    assert permission.can_write is True
+
+
+def test_provider_registry_from_accounts_keeps_static_permissions():
+    registry = provider_registry_from_accounts(
+        [],
+        _MemoryTokenStore(),
+        env={"WHYWIKI_COLLAB_STATIC_PERMISSIONS": "github:owner/repo=read"},
+    )
+
+    permission = registry.check_repo(RepoRef(provider="github", repo="owner/repo"))
+
+    assert permission.can_read is True
+    assert permission.can_write is False
+
+
+def test_provider_registry_from_accounts_token_overrides_static_permissions(monkeypatch):
+    captured_requests = []
+    identity = ProviderIdentity(provider="github", account="alice", provider_user_id="1")
+    token_store = _MemoryTokenStore()
+    token_store.save(identity, ProviderToken(access_token="github-token"))
+
+    def fake_urlopen(request, timeout):
+        captured_requests.append(request)
+        return _FakeHTTPResponse({"permissions": {"push": True}})
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    registry = provider_registry_from_accounts(
+        [identity],
+        token_store,
+        env={"WHYWIKI_COLLAB_STATIC_PERMISSIONS": "github:owner/whywiki-memory=read"},
+    )
+    permission = registry.check_repo(RepoRef(provider="github", repo="owner/whywiki-memory"))
+
+    request = captured_requests[0]
+    assert _request_header(request, "Authorization") == "Bearer github-token"
+    assert permission.can_read is True
+    assert permission.can_write is True
 
 
 def test_registry_reports_missing_identity_for_unknown_provider_key():
