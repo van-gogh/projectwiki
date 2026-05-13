@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Mapping, Protocol
 
-from whywiki.collaboration.models import RepoPermission, RepoRef
+from whywiki.collaboration.models import ProviderIdentity, RepoPermission, RepoRef
 
 
 class ProviderClient(Protocol):
@@ -76,6 +76,26 @@ class GitHubProviderClient:
         )
         return _permission(repo, True, can_write)
 
+    def authenticated_identity(self) -> ProviderIdentity:
+        from urllib.request import Request, urlopen
+
+        request = Request(
+            "https://api.github.com/user",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {self._token}",
+                "User-Agent": "WhyWiki",
+            },
+            method="GET",
+        )
+        with urlopen(request, timeout=self._timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return ProviderIdentity(
+            provider="github",
+            account=str(payload["login"]),
+            provider_user_id=str(payload["id"]),
+        )
+
 
 class GiteaProviderClient:
     def __init__(self, base_url: str, token: str, timeout: float = 10.0) -> None:
@@ -110,6 +130,27 @@ class GiteaProviderClient:
         permissions = payload.get("permissions", {})
         can_write = bool(permissions.get("push") or permissions.get("admin"))
         return _permission(repo, True, can_write)
+
+    def authenticated_identity(self) -> ProviderIdentity:
+        from urllib.request import Request, urlopen
+
+        request = Request(
+            f"{self._base_url}/api/v1/user",
+            headers={
+                "Accept": "application/json",
+                "Authorization": f"token {self._token}",
+                "User-Agent": "WhyWiki",
+            },
+            method="GET",
+        )
+        with urlopen(request, timeout=self._timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        return ProviderIdentity(
+            provider="gitea",
+            base_url=self._base_url,
+            account=str(payload["login"]),
+            provider_user_id=str(payload["id"]),
+        )
 
 
 def _permission(repo: RepoRef, can_read: bool, can_write: bool) -> RepoPermission:

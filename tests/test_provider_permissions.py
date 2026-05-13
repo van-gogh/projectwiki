@@ -155,6 +155,30 @@ def test_github_client_reraises_unexpected_http_errors(monkeypatch):
     assert error.value.code == 500
 
 
+def test_github_client_reads_authenticated_identity(monkeypatch):
+    captured_requests = []
+    token = "github-secret-token"
+
+    def fake_urlopen(request, timeout):
+        captured_requests.append(request)
+        return _FakeHTTPResponse({"login": "octocat", "id": 42})
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    identity = GitHubProviderClient(token=token, timeout=2.0).authenticated_identity()
+
+    request = captured_requests[0]
+    assert request.get_full_url() == "https://api.github.com/user"
+    assert request.get_method() == "GET"
+    assert _request_header(request, "Accept") == "application/vnd.github+json"
+    assert _request_header(request, "Authorization") == f"Bearer {token}"
+    assert _request_header(request, "User-Agent") == "WhyWiki"
+    assert identity.provider == "github"
+    assert identity.account == "octocat"
+    assert identity.provider_user_id == "42"
+    assert identity.base_url is None
+
+
 @pytest.mark.parametrize("permission_name", ["push", "admin"])
 def test_gitea_client_success_quotes_repo_and_reads_write_permissions(monkeypatch, permission_name):
     captured_requests = []
@@ -207,3 +231,31 @@ def test_gitea_client_reraises_unexpected_http_errors(monkeypatch):
         )
 
     assert error.value.code == 500
+
+
+def test_gitea_client_reads_authenticated_identity(monkeypatch):
+    captured_requests = []
+    token = "gitea-secret-token"
+
+    def fake_urlopen(request, timeout):
+        captured_requests.append(request)
+        return _FakeHTTPResponse({"login": "mona", "id": 84})
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+
+    identity = GiteaProviderClient(
+        base_url="https://git.example.test/",
+        token=token,
+        timeout=2.0,
+    ).authenticated_identity()
+
+    request = captured_requests[0]
+    assert request.get_full_url() == "https://git.example.test/api/v1/user"
+    assert request.get_method() == "GET"
+    assert _request_header(request, "Accept") == "application/json"
+    assert _request_header(request, "Authorization") == f"token {token}"
+    assert _request_header(request, "User-Agent") == "WhyWiki"
+    assert identity.provider == "gitea"
+    assert identity.base_url == "https://git.example.test"
+    assert identity.account == "mona"
+    assert identity.provider_user_id == "84"
