@@ -162,6 +162,8 @@ def test_i18n_includes_git_provider_collaboration_copy():
 
     assert "Login with GitHub" in content
     assert "Login with Gitea" in content
+    assert "No workspace access" in content
+    assert "Workspace read-only" in content
     assert "缺少代码仓库访问权限" in content
 
 
@@ -170,6 +172,21 @@ def test_app_js_fetches_collaboration_status_endpoints():
 
     assert "/api/auth/accounts" in content
     assert "/api/workspace/status" in content
+    assert "workspaceStatusPath" in content
+    assert "project_slug=" in content
+    assert "encodeURIComponent(currentProjectId)" in content
+
+
+def test_app_js_renders_workspace_access_report():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+    css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+    assert "workspace.access" in content
+    assert "can_enter_workspace" in content
+    assert "can_review" in content
+    assert "workspaceAccessDenied" in content
+    assert "workspaceReadOnly" in content
+    assert ".status-pill.warning" in css
 
 
 def test_app_js_rerenders_active_view_after_language_change():

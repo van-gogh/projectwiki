@@ -11,6 +11,7 @@ from .collaboration.artifacts import (
     load_workspace_config,
     save_workspace_config,
 )
+from .collaboration.env import static_provider_registry_from_env
 from .collaboration.models import ProviderIdentity, RepoRef, WorkspaceConfig
 from .config import get_data_dir
 from .db import init_db
@@ -29,6 +30,7 @@ from .runtime import (
     write_runtime_state,
 )
 from .services.ask import ask_project
+from .services.collaboration import CollaborationService
 from .services.ingest import ingest_path
 from .services.wiki_engine import build_project
 from .services.workspace import create_project, list_projects
@@ -241,9 +243,11 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.workspace_command == "status":
             if not paths.workspace_config_path.exists():
-                print_json({"configured": False, "workspace": None, "projects": {}})
+                print_json({"configured": False, "workspace": None, "projects": {}, "access": None})
                 return 0
-            print_json({"configured": True, **load_workspace_config(paths).to_dict()})
+            config = load_workspace_config(paths)
+            access = CollaborationService(config, static_provider_registry_from_env()).check_workspace(project_slug=None)
+            print_json({"configured": True, **config.to_dict(), "access": access.to_dict()})
             return 0
 
     if args.command == "serve":

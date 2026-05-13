@@ -144,11 +144,12 @@ function renderAccountStatus(accounts) {
 }
 
 function missingLinkedRepoPermissions(workspace) {
-  if (Array.isArray(workspace?.missing_required_linked_repo_permissions)) {
-    return workspace.missing_required_linked_repo_permissions;
+  const access = workspace?.access || workspace;
+  if (Array.isArray(access?.missing_required_linked_repo_permissions)) {
+    return access.missing_required_linked_repo_permissions;
   }
-  if (Array.isArray(workspace?.linked_repos)) {
-    return workspace.linked_repos.filter((permission) => permission && permission.can_read === false);
+  if (Array.isArray(access?.linked_repos)) {
+    return access.linked_repos.filter((permission) => permission && permission.can_read === false);
   }
   return [];
 }
@@ -161,16 +162,35 @@ function renderWorkspaceStatus(workspace) {
   if (!workspace?.configured || !workspace.workspace) {
     status.className = "status-pill muted";
     status.textContent = t("notConfigured");
-    if (linkedRepoStatus) linkedRepoStatus.textContent = "";
+    if (linkedRepoStatus) {
+      linkedRepoStatus.textContent = "";
+      linkedRepoStatus.classList.remove("is-warning");
+    }
     return;
   }
 
-  status.className = "status-pill ok";
-  status.textContent = workspace.workspace.repo || t("workspaceReady");
+  const access = workspace.access || null;
+  if (access && !access.can_enter_workspace) {
+    status.className = "status-pill warning";
+    status.textContent = t("workspaceAccessDenied");
+    if (linkedRepoStatus) {
+      linkedRepoStatus.textContent = access.workspace?.repo_key || workspace.workspace.repo || "";
+      linkedRepoStatus.classList.add("is-warning");
+    }
+    return;
+  }
+
+  if (access && !access.can_review) {
+    status.className = "status-pill muted";
+    status.textContent = t("workspaceReadOnly");
+  } else {
+    status.className = "status-pill ok";
+    status.textContent = workspace.workspace.repo || t("workspaceReady");
+  }
 
   if (!linkedRepoStatus) return;
   const missingPermissions = missingLinkedRepoPermissions(workspace);
-  if (workspace.missing_required_linked_repo_access || missingPermissions.length) {
+  if (access?.missing_required_linked_repo_access || workspace.missing_required_linked_repo_access || missingPermissions.length) {
     const repos = missingPermissions.map((permission) => permission.repo_key).filter(Boolean).join(", ");
     linkedRepoStatus.textContent = repos ? `${t("missingLinkedRepoAccess")}: ${repos}` : t("missingLinkedRepoAccess");
     linkedRepoStatus.classList.add("is-warning");
@@ -180,12 +200,17 @@ function renderWorkspaceStatus(workspace) {
   linkedRepoStatus.classList.remove("is-warning");
 }
 
+function workspaceStatusPath() {
+  if (!currentProjectId) return "/api/workspace/status";
+  return `/api/workspace/status?project_slug=${encodeURIComponent(currentProjectId)}`;
+}
+
 async function loadCollaborationStatus() {
   const fallbackWorkspace = { configured: false, workspace: null };
   try {
     const [accountsResult, workspaceResult] = await Promise.allSettled([
       api("/api/auth/accounts"),
-      api("/api/workspace/status"),
+      api(workspaceStatusPath()),
     ]);
     const accountsPayload = accountsResult.status === "fulfilled" ? accountsResult.value : { connected_accounts: [] };
     collaborationState.accounts = Array.isArray(accountsPayload.connected_accounts) ? accountsPayload.connected_accounts : [];
@@ -203,6 +228,9 @@ async function loadCollaborationStatus() {
 function setCurrentProjectId(projectId) {
   currentProjectId = projectId;
   storageSet("whywiki.currentProjectId", projectId);
+  if (collaborationState.loaded) {
+    loadCollaborationStatus();
+  }
 }
 
 function appendField(list, label, value) {

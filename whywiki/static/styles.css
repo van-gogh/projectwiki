@@ -147,6 +147,12 @@ body {
   color: #047857;
 }
 
+.status-pill.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .linked-repo-status {
   min-width: 0;
   color: var(--muted);

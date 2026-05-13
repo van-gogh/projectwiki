@@ -71,6 +71,8 @@ def test_workspace_connect_and_status(tmp_path, monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["configured"] is True
     assert payload["workspace"]["repo"] == "owner/whywiki-memory"
+    assert payload["access"]["can_enter_workspace"] is False
+    assert payload["access"]["workspace"]["missing_provider_identity"] == "github"
 
 
 def test_workspace_connect_gitea_without_base_url_returns_2(tmp_path, monkeypatch, capsys):
@@ -90,4 +92,4 @@ def test_workspace_status_not_configured(tmp_path, monkeypatch, capsys):
     assert main(["workspace", "status"]) == 0
 
     payload = json.loads(capsys.readouterr().out)
-    assert payload == {"configured": False, "workspace": None, "projects": {}}
+    assert payload == {"configured": False, "workspace": None, "projects": {}, "access": None}
