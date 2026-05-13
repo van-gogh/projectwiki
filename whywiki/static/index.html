@@ -18,6 +18,21 @@
       <button data-view="ask" data-i18n="nav.ask">Ask</button>
       <button data-view="settings" data-i18n="nav.settings">Settings</button>
     </nav>
+    <section class="collaboration-panel" aria-label="Collaboration">
+      <div class="collaboration-panel__row">
+        <span data-i18n="accountStatusLabel">Accounts</span>
+        <span id="accountStatus" class="status-pill">Not connected</span>
+      </div>
+      <div class="collaboration-panel__actions">
+        <button id="loginGithubButton" class="secondary-action" type="button" data-i18n="loginGithub">Login with GitHub</button>
+        <button id="loginGiteaButton" class="secondary-action" type="button" data-i18n="loginGitea">Login with Gitea</button>
+      </div>
+      <div class="collaboration-panel__row">
+        <span data-i18n="workspaceStatusLabel">Workspace</span>
+        <span id="workspaceStatus" class="status-pill">Not configured</span>
+      </div>
+      <div id="linkedRepoStatus" class="linked-repo-status"></div>
+    </section>
   </aside>
   <main class="workspace">
     <header class="topbar">

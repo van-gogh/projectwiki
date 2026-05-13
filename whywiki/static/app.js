@@ -1,6 +1,11 @@
 const supportedLanguages = ["zh-CN", "en-US"];
 let currentProjectId = storageGet("whywiki.currentProjectId");
 let languageBounceTimer = null;
+let collaborationState = {
+  accounts: [],
+  workspace: { configured: false, workspace: null },
+  loaded: false,
+};
 
 function dictionary() {
   const dictionaries = window.WhyWikiI18n || {};
@@ -66,6 +71,10 @@ function translate(lang) {
   });
   updateLanguageSwitch(normalizedLang);
   storageSet("whywiki.language", normalizedLang);
+  if (collaborationState.loaded) {
+    renderAccountStatus(collaborationState.accounts);
+    renderWorkspaceStatus(collaborationState.workspace);
+  }
 }
 
 async function api(path, options = {}) {
@@ -107,6 +116,84 @@ async function apiText(path, options = {}) {
     throw new Error(detail);
   }
   return response.text();
+}
+
+function providerAccountLabel(identity) {
+  const provider = identity.provider || "provider";
+  const account = identity.account || identity.provider_user_id || "";
+  return account ? `${provider}:${account}` : provider;
+}
+
+function renderAccountStatus(accounts) {
+  const status = document.querySelector("#accountStatus");
+  if (!status) return;
+
+  const accountList = Array.isArray(accounts) ? accounts : [];
+  if (!accountList.length) {
+    status.className = "status-pill muted";
+    status.textContent = t("notConnected");
+    return;
+  }
+
+  status.className = "status-pill ok";
+  status.textContent = accountList.map(providerAccountLabel).join(", ");
+}
+
+function missingLinkedRepoPermissions(workspace) {
+  if (Array.isArray(workspace?.missing_required_linked_repo_permissions)) {
+    return workspace.missing_required_linked_repo_permissions;
+  }
+  if (Array.isArray(workspace?.linked_repos)) {
+    return workspace.linked_repos.filter((permission) => permission && permission.can_read === false);
+  }
+  return [];
+}
+
+function renderWorkspaceStatus(workspace) {
+  const status = document.querySelector("#workspaceStatus");
+  const linkedRepoStatus = document.querySelector("#linkedRepoStatus");
+  if (!status) return;
+
+  if (!workspace?.configured || !workspace.workspace) {
+    status.className = "status-pill muted";
+    status.textContent = t("notConfigured");
+    if (linkedRepoStatus) linkedRepoStatus.textContent = "";
+    return;
+  }
+
+  status.className = "status-pill ok";
+  status.textContent = workspace.workspace.repo || t("workspaceReady");
+
+  if (!linkedRepoStatus) return;
+  const missingPermissions = missingLinkedRepoPermissions(workspace);
+  if (workspace.missing_required_linked_repo_access || missingPermissions.length) {
+    const repos = missingPermissions.map((permission) => permission.repo_key).filter(Boolean).join(", ");
+    linkedRepoStatus.textContent = repos ? `${t("missingLinkedRepoAccess")}: ${repos}` : t("missingLinkedRepoAccess");
+    linkedRepoStatus.classList.add("is-warning");
+    return;
+  }
+  linkedRepoStatus.textContent = "";
+  linkedRepoStatus.classList.remove("is-warning");
+}
+
+async function loadCollaborationStatus() {
+  const fallbackWorkspace = { configured: false, workspace: null };
+  try {
+    const [accountsResult, workspaceResult] = await Promise.allSettled([
+      api("/api/auth/accounts"),
+      api("/api/workspace/status"),
+    ]);
+    const accountsPayload = accountsResult.status === "fulfilled" ? accountsResult.value : { connected_accounts: [] };
+    collaborationState.accounts = Array.isArray(accountsPayload.connected_accounts) ? accountsPayload.connected_accounts : [];
+    collaborationState.workspace = workspaceResult.status === "fulfilled" ? workspaceResult.value : fallbackWorkspace;
+  } catch {
+    collaborationState.accounts = [];
+    collaborationState.workspace = fallbackWorkspace;
+  } finally {
+    collaborationState.loaded = true;
+    renderAccountStatus(collaborationState.accounts);
+    renderWorkspaceStatus(collaborationState.workspace);
+  }
 }
 
 function setCurrentProjectId(projectId) {
@@ -885,4 +972,5 @@ document.querySelectorAll("[data-view]").forEach((button) => {
 });
 
 translate(initialLanguage());
+loadCollaborationStatus();
 loadView(currentProjectId ? "status" : "start");

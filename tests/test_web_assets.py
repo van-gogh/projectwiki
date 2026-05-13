@@ -136,6 +136,29 @@ def test_i18n_contains_chinese_and_english_dictionaries():
     assert "error.readLogs" in content
 
 
+def test_sidebar_exposes_collaboration_status_targets():
+    content = (STATIC / "index.html").read_text(encoding="utf-8")
+
+    assert 'id="accountStatus"' in content
+    assert 'id="workspaceStatus"' in content
+    assert 'id="linkedRepoStatus"' in content
+
+
+def test_i18n_includes_git_provider_collaboration_copy():
+    content = (STATIC / "i18n.js").read_text(encoding="utf-8")
+
+    assert "Login with GitHub" in content
+    assert "Login with Gitea" in content
+    assert "缺少代码仓库访问权限" in content
+
+
+def test_app_js_fetches_collaboration_status_endpoints():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "/api/auth/accounts" in content
+    assert "/api/workspace/status" in content
+
+
 def test_i18n_buttons_have_english_fallback_labels():
     parser = parse_dashboard()
 
