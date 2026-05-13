@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -16,9 +17,11 @@ from .collaboration.artifacts import (
     save_workspace_config,
 )
 from .collaboration.models import RepoRef, WorkspaceConfig
+from .collaboration.providers import ProviderRegistry, StaticProviderClient
 from .config import get_data_dir
 from .db import connect, init_db, rows_to_dicts
 from .services.ask import ask_project
+from .services.collaboration import CollaborationService
 from .services.ingest import ingest_path
 from .services.wiki_engine import build_project
 from .services.workspace import create_project, get_project, list_projects
@@ -58,6 +61,51 @@ def account_store() -> AccountStore:
 
 def workspace_paths() -> WorkspaceArtifactPaths:
     return WorkspaceArtifactPaths(get_data_dir() / "workspace")
+
+
+def static_provider_registry_from_env() -> ProviderRegistry:
+    registry = ProviderRegistry()
+    permissions_by_provider: dict[str, dict[str, tuple[bool, bool]]] = {}
+    raw_permissions = os.getenv("WHYWIKI_COLLAB_STATIC_PERMISSIONS", "")
+    for entry in raw_permissions.split(","):
+        if "=" not in entry:
+            continue
+        repo_key, access = (part.strip() for part in entry.split("=", maxsplit=1))
+        if access == "read":
+            permission = (True, False)
+        elif access == "write":
+            permission = (True, True)
+        else:
+            continue
+
+        provider_key = static_permission_provider_key(repo_key)
+        if provider_key is None:
+            continue
+        permissions_by_provider.setdefault(provider_key, {})[repo_key] = permission
+
+    for provider_key, permissions in permissions_by_provider.items():
+        registry.register(provider_key, StaticProviderClient(permissions))
+    return registry
+
+
+def static_permission_provider_key(repo_key: str) -> str | None:
+    if repo_key.startswith("github:"):
+        return "github"
+    if repo_key.startswith("gitea:"):
+        provider_key, repo = repo_key.rsplit(":", maxsplit=1)
+        if repo and "/" in repo:
+            return provider_key
+    return None
+
+
+def collaboration_service_or_none() -> CollaborationService | None:
+    paths = workspace_paths()
+    if not paths.workspace_config_path.exists():
+        return None
+    return CollaborationService(
+        load_workspace_config(paths),
+        static_provider_registry_from_env(),
+    )
 
 
 @app.on_event("startup")
@@ -217,6 +265,12 @@ def api_conflicts(project_id: str) -> list[dict]:
 def api_update_conflict(project_id: str, conflict_id: str, req: ConflictStatusRequest) -> dict:
     if req.status not in {"open", "resolved", "ignored"}:
         raise HTTPException(status_code=400, detail="Invalid conflict status")
+    service = collaboration_service_or_none()
+    if service is not None:
+        try:
+            service.require_review_access(project_slug=None)
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
     with connect() as conn:
         row = conn.execute(
             "SELECT id FROM conflicts WHERE project_id = ? AND id = ?",
