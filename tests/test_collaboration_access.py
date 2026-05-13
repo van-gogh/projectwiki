@@ -1,6 +1,7 @@
 import pytest
 
 from whywiki.collaboration.models import LinkedRepo, RepoRef, WorkspaceConfig
+from whywiki.collaboration.models import RepoPermission
 from whywiki.collaboration.providers import ProviderRegistry, StaticProviderClient
 from whywiki.services.collaboration import CollaborationService
 
@@ -87,6 +88,64 @@ def test_optional_linked_repo_does_not_block_project_memory():
     assert report.can_view_project_memory is True
 
 
+def test_unreadable_workspace_does_not_check_or_return_linked_repo_permissions():
+    config = WorkspaceConfig(
+        workspace=RepoRef(provider="github", repo="owner/whywiki-memory"),
+        projects={
+            "demo": [
+                LinkedRepo(id="backend", repo=RepoRef(provider="github", repo="owner/code"), required=True),
+            ]
+        },
+    )
+    registry = ProviderRegistry()
+    registry.register(
+        "github",
+        StaticProviderClient(
+            {
+                "github:owner/whywiki-memory": (False, False),
+                "github:owner/code": (True, False),
+            }
+        ),
+    )
+    service = CollaborationService(config=config, providers=registry)
+
+    report = service.check_workspace(project_slug="demo")
+
+    assert report.can_enter_workspace is False
+    assert report.linked_repos == ()
+    assert report.to_dict()["linked_repos"] == []
+
+
+class RaisingProviderClient:
+    def check_repo(self, repo: RepoRef) -> RepoPermission:
+        raise RuntimeError(f"should not check optional repo {repo.key}")
+
+
+def test_optional_linked_repo_is_not_checked():
+    config = WorkspaceConfig(
+        workspace=RepoRef(provider="github", repo="owner/whywiki-memory"),
+        projects={
+            "demo": [
+                LinkedRepo(
+                    id="optional-gitea-docs",
+                    repo=RepoRef(provider="gitea", repo="team/docs", base_url="https://git.example.test"),
+                    required=False,
+                ),
+            ]
+        },
+    )
+    registry = ProviderRegistry()
+    registry.register("github", StaticProviderClient({"github:owner/whywiki-memory": (True, True)}))
+    registry.register("gitea:https://git.example.test", RaisingProviderClient())
+    service = CollaborationService(config=config, providers=registry)
+
+    report = service.check_workspace(project_slug="demo")
+
+    assert report.can_enter_workspace is True
+    assert report.linked_repos == ()
+    assert report.can_view_project_memory is True
+
+
 def test_require_workspace_read_raises_when_workspace_unreadable():
     config = WorkspaceConfig(workspace=RepoRef(provider="github", repo="owner/whywiki-memory"))
     registry = ProviderRegistry()
@@ -157,4 +216,3 @@ def test_require_review_access_returns_report_when_all_permissions_exist():
 
     assert report.can_review is True
     assert report.can_view_project_memory is True
-

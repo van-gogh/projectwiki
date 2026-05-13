@@ -11,12 +11,15 @@ class CollaborationService:
 
     def check_workspace(self, project_slug: str | None) -> WorkspaceAccessReport:
         workspace_permission = self.providers.check_repo(self.config.workspace)
+        if not workspace_permission.can_read:
+            return WorkspaceAccessReport(workspace=workspace_permission)
         linked_permissions = []
         if project_slug is not None:
             for linked_repo in self.config.projects.get(project_slug, []):
+                if not linked_repo.required:
+                    continue
                 permission = self.providers.check_repo(linked_repo.repo)
-                if linked_repo.required:
-                    linked_permissions.append(permission)
+                linked_permissions.append(permission)
         return WorkspaceAccessReport(workspace=workspace_permission, linked_repos=linked_permissions)
 
     def require_workspace_read(self, project_slug: str | None = None) -> WorkspaceAccessReport:
