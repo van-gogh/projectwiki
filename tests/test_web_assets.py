@@ -194,6 +194,23 @@ def test_app_js_contains_real_auth_flow_hooks():
     assert "renderAuthConnectionPanel" in content
 
 
+def test_app_js_guards_github_polling_session_state():
+    content = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "authFlowId" in content
+    assert "githubPollTimer" in content
+    assert "clearGithubPollTimer" in content
+    assert "nextAuthSessionId" in content
+    assert "isCurrentGithubSession" in content
+    assert "if (authConnectionState.busy) return;" in content
+    assert "authConnectionState.sessionId" in content
+    assert "sessionId !== authConnectionState.sessionId" in content
+    assert "deviceCode !== authConnectionState.github?.deviceCode" in content
+    assert "githubPollTimer = window.setTimeout" in content
+    assert "githubLoginButton.disabled = authConnectionState.busy" in content
+    assert "giteaLoginButton.disabled = authConnectionState.busy" in content
+
+
 def test_i18n_contains_real_auth_states():
     content = (STATIC / "i18n.js").read_text(encoding="utf-8")
 

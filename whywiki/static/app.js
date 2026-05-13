@@ -3,12 +3,15 @@ let currentProjectId = storageGet("whywiki.currentProjectId");
 let currentProject = null;
 let activeView = "projects";
 let languageBounceTimer = null;
+let authFlowId = 0;
+let githubPollTimer = null;
 let collaborationState = {
   accounts: [],
   workspace: { configured: false, workspace: null },
   loaded: false,
 };
 let authConnectionState = {
+  sessionId: null,
   mode: "idle",
   busy: false,
   message: null,
@@ -146,8 +149,32 @@ function renderAuthMessage(kind, title, body = "") {
   return message;
 }
 
+function nextAuthSessionId() {
+  authFlowId += 1;
+  return authFlowId;
+}
+
+function clearGithubPollTimer() {
+  if (githubPollTimer !== null) {
+    window.clearTimeout(githubPollTimer);
+    githubPollTimer = null;
+  }
+}
+
+function isCurrentGithubSession(sessionId, deviceCode) {
+  if (sessionId !== authConnectionState.sessionId) return false;
+  if (authConnectionState.mode !== "github_waiting") return false;
+  if (deviceCode !== authConnectionState.github?.deviceCode) return false;
+  return true;
+}
+
 async function startGithubLogin() {
+  if (authConnectionState.busy) return;
+  if (authConnectionState.mode === "github_waiting") return;
+  clearGithubPollTimer();
+  const sessionId = nextAuthSessionId();
   authConnectionState = {
+    sessionId,
     mode: "github_waiting",
     busy: true,
     message: { kind: "loading", title: t("auth.waiting"), body: t("auth.githubOpening") },
@@ -158,12 +185,15 @@ async function startGithubLogin() {
 
   try {
     const result = await api("/api/auth/github/device/start", { method: "POST", body: "{}" });
+    if (sessionId !== authConnectionState.sessionId || authConnectionState.mode !== "github_waiting") return;
+    const deviceCode = result.device_code;
     authConnectionState = {
+      sessionId,
       mode: "github_waiting",
       busy: false,
       message: null,
       github: {
-        deviceCode: result.device_code,
+        deviceCode,
         userCode: result.user_code,
         verificationUri: result.verification_uri,
         interval: result.interval || result.poll_after_seconds || 5,
@@ -171,8 +201,10 @@ async function startGithubLogin() {
       gitea: null,
     };
     renderAuthConnectionPanel();
-    pollGithubDevice();
+    pollGithubDevice(sessionId, deviceCode);
   } catch (error) {
+    if (sessionId !== authConnectionState.sessionId) return;
+    clearGithubPollTimer();
     authConnectionState = {
       ...authConnectionState,
       mode: "github_failed",
@@ -187,9 +219,9 @@ async function startGithubLogin() {
   }
 }
 
-async function pollGithubDevice() {
+async function pollGithubDevice(sessionId, deviceCode) {
   const github = authConnectionState.github;
-  if (!github?.deviceCode || authConnectionState.mode !== "github_waiting") return;
+  if (!github?.deviceCode || !isCurrentGithubSession(sessionId, deviceCode)) return;
 
   try {
     const result = await api("/api/auth/github/device/poll", {
@@ -199,9 +231,12 @@ async function pollGithubDevice() {
         current_interval: github.interval,
       }),
     });
+    if (!isCurrentGithubSession(sessionId, deviceCode)) return;
 
     if (result.status === "connected") {
+      clearGithubPollTimer();
       authConnectionState = {
+        sessionId,
         mode: "connected",
         busy: false,
         message: { kind: "success", title: t("auth.connected"), body: providerAccountLabel(result.identity || {}) },
@@ -217,8 +252,11 @@ async function pollGithubDevice() {
     authConnectionState.github = { ...github, interval: nextInterval };
     authConnectionState.message = { kind: "loading", title: t("auth.waiting"), body: t("auth.githubOpening") };
     renderAuthConnectionPanel();
-    window.setTimeout(pollGithubDevice, Math.max(1, nextInterval) * 1000);
+    clearGithubPollTimer();
+    githubPollTimer = window.setTimeout(() => pollGithubDevice(sessionId, deviceCode), Math.max(1, nextInterval) * 1000);
   } catch (error) {
+    if (!isCurrentGithubSession(sessionId, deviceCode)) return;
+    clearGithubPollTimer();
     authConnectionState = {
       ...authConnectionState,
       mode: "github_failed",
@@ -264,9 +302,13 @@ function renderGiteaForm() {
 }
 
 async function startGiteaLogin(formData) {
+  if (authConnectionState.busy) return;
+  clearGithubPollTimer();
+  const sessionId = nextAuthSessionId();
   const baseUrl = String(formData.get("base_url") || "").trim();
   const clientId = String(formData.get("client_id") || "").trim();
   authConnectionState = {
+    sessionId,
     mode: "gitea_form",
     busy: true,
     message: { kind: "loading", title: t("auth.waiting"), body: t("auth.giteaReturn") },
@@ -280,10 +322,12 @@ async function startGiteaLogin(formData) {
       method: "POST",
       body: JSON.stringify({ base_url: baseUrl, client_id: clientId }),
     });
+    if (sessionId !== authConnectionState.sessionId || authConnectionState.mode !== "gitea_form") return;
     if (result.authorization_url) {
       window.open(result.authorization_url, "_blank", "noopener");
     }
     authConnectionState = {
+      sessionId,
       mode: "gitea_redirect",
       busy: false,
       message: { kind: "loading", title: t("auth.waiting"), body: t("auth.giteaReturn") },
@@ -296,6 +340,7 @@ async function startGiteaLogin(formData) {
     };
     renderAuthConnectionPanel();
   } catch (error) {
+    if (sessionId !== authConnectionState.sessionId) return;
     authConnectionState = {
       ...authConnectionState,
       busy: false,
@@ -311,15 +356,18 @@ async function startGiteaLogin(formData) {
 
 async function disconnectAccount(identityKey) {
   if (!identityKey) return;
+  clearGithubPollTimer();
+  const sessionId = nextAuthSessionId();
   authConnectionState = {
     ...authConnectionState,
+    sessionId,
     busy: true,
     message: { kind: "loading", title: t("auth.waiting"), body: "" },
   };
   renderAuthConnectionPanel();
   try {
     await api(`/api/auth/accounts/${encodeURIComponent(identityKey)}`, { method: "DELETE" });
-    authConnectionState = { mode: "idle", busy: false, message: null, github: null, gitea: null };
+    authConnectionState = { sessionId, mode: "idle", busy: false, message: null, github: null, gitea: null };
     await loadCollaborationStatus();
   } catch (error) {
     authConnectionState = {
@@ -347,6 +395,11 @@ function accountIdentityKey(identity) {
 function renderAuthConnectionPanel() {
   const panel = authPanel();
   if (!panel) return;
+  const githubLoginButton = document.querySelector("#loginGithubButton");
+  if (githubLoginButton) githubLoginButton.disabled = authConnectionState.busy;
+  if (githubLoginButton && authConnectionState.mode === "github_waiting") githubLoginButton.disabled = true;
+  const giteaLoginButton = document.querySelector("#loginGiteaButton");
+  if (giteaLoginButton) giteaLoginButton.disabled = authConnectionState.busy;
 
   const children = [];
   if (authConnectionState.message) {
@@ -1843,7 +1896,10 @@ if (githubLoginButton) {
 const giteaLoginButton = document.querySelector("#loginGiteaButton");
 if (giteaLoginButton) {
   giteaLoginButton.addEventListener("click", () => {
+    clearGithubPollTimer();
+    const sessionId = nextAuthSessionId();
     authConnectionState = {
+      sessionId,
       mode: "gitea_form",
       busy: false,
       message: null,
