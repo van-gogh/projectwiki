@@ -9,6 +9,14 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .collaboration.accounts import AccountStore
+from .collaboration.artifacts import (
+    WorkspaceArtifactPaths,
+    load_workspace_config,
+    save_workspace_config,
+)
+from .collaboration.models import RepoRef, WorkspaceConfig
+from .config import get_data_dir
 from .db import connect, init_db, rows_to_dicts
 from .services.ask import ask_project
 from .services.ingest import ingest_path
@@ -36,6 +44,20 @@ class AskRequest(BaseModel):
 
 class ConflictStatusRequest(BaseModel):
     status: str
+
+
+class ConnectWorkspaceRequest(BaseModel):
+    provider: str
+    repo: str
+    base_url: str | None = None
+
+
+def account_store() -> AccountStore:
+    return AccountStore(get_data_dir() / "auth" / "accounts.json")
+
+
+def workspace_paths() -> WorkspaceArtifactPaths:
+    return WorkspaceArtifactPaths(get_data_dir() / "workspace")
 
 
 @app.on_event("startup")
@@ -72,6 +94,40 @@ def api_create_project(req: CreateProjectRequest) -> dict:
 @app.get("/api/projects")
 def api_list_projects() -> list[dict]:
     return list_projects()
+
+
+@app.get("/api/auth/accounts")
+def api_auth_accounts() -> dict:
+    return {
+        "connected_accounts": [
+            identity.to_dict()
+            for identity in account_store().list_identities()
+        ]
+    }
+
+
+@app.post("/api/workspace/connect")
+def api_connect_workspace(req: ConnectWorkspaceRequest) -> dict:
+    try:
+        config = WorkspaceConfig(
+            workspace=RepoRef(
+                provider=req.provider,
+                repo=req.repo,
+                base_url=req.base_url,
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    save_workspace_config(workspace_paths(), config)
+    return {"workspace": config.workspace.to_dict()}
+
+
+@app.get("/api/workspace/status")
+def api_workspace_status() -> dict:
+    paths = workspace_paths()
+    if not paths.workspace_config_path.exists():
+        return {"configured": False, "workspace": None, "projects": {}}
+    return {"configured": True, **load_workspace_config(paths).to_dict()}
 
 
 @app.get("/api/projects/{project_id}")
